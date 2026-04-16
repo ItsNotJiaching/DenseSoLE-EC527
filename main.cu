@@ -19,66 +19,48 @@ void print_array(float* v, int arr_len);
 
 #define OPTIONS 3
 
-
+/**
+ * Main Function. Only testing square matrices with array sizes multiple of 8.
+ * (look into -- does SoLE apply to non-square matrices? Pretty sure no)
+ */
 int main(){
   int OPTION;
   struct timespec time_start, time_stop;
   double time_stamp[OPTIONS][NUM_TESTS];
   double wakeup_answer;
-  long int x, n, alloc_size;
+  long int x, n, arr_len;
+  long int alloc_size_vec, alloc_size_mat;
   wakeup_answer = wakeup_delay();
 
   x = NUM_TESTS-1;
-  alloc_size = A*x*x + B*x + C;
+  arr_len = A*x*x + B*x + C;
+  alloc_size_mat = arr_len * arr_len * sizeof(data_t);
+  alloc_size_vec = arr_len * arr_len * sizeof(data_t);
+
+  // Initalize data arrays
+  float* arrA = (float *) malloc(alloc_size_mat);
+  float* arrX;
+  float* arrB;
 
   // Terminal Output
   printf("Running Dense System of Linear Equations (SoLE) Test ");
-  printf("for %d different matrix sizes from %d to %d\n\n", NUM_TESTS, C, alloc_size);  
+  printf("for %d different matrix sizes from %d to %d\n\n", NUM_TESTS, C, arr_len);  
   printf("This may take a while!\n\n");
 
-  // // Arrays on GPU global memory
-  // float *d_A, *d_B, *d_C;
-
-  // // Arrays on the host memory
-  // float *h_A, *h_B, *h_C, *h_C_dev;
-
-  // int i, errCount = 0, zeroCount = 0;
-  // size_t allocSize = arrLen * arrLen * sizeof(float);
-
-  // // printf("Length of the array = %d\n", arrLen);
-
-  // // Allocate GPU memory
-  // CUDA_SAFE_CALL(cudaMalloc((void **)&d_A, allocSize));
-  // CUDA_SAFE_CALL(cudaMalloc((void **)&d_B, allocSize));
-  // CUDA_SAFE_CALL(cudaMalloc((void **)&d_C, allocSize));
-
-  // // Allocate arrays on host memory
-  // h_A                    = (float *) malloc(allocSize);
-  // h_B                    = (float *) malloc(allocSize);
-  // h_C                    = (float *) malloc(allocSize);
-  // h_C_dev                = (float *) malloc(allocSize);
-  // memset(h_C, 0, allocSize);
-
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=alloc_size); x++) {
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     printf(" OPT %d, iter %ld, size %ld\n", OPTION, x, n);
-    set_matrix_row_length(a0, n);
-    set_matrix_row_length(b0, n);
-    set_matrix_row_length(c0, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
-    mmm_ijk(a0, b0, c0, 4);
+    sole_serial(arrA, arrX, arrB, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
   }
 
   OPTION++;
 
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=alloc_size); x++) {
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     printf(" OPT %d, iter %ld, size %ld\n", OPTION, x, n);
-    set_matrix_row_length(a0, n);
-    set_matrix_row_length(b0, n);
-    set_matrix_row_length(c0, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
-    mmm_ijk(a0, b0, c0, 64);
+    sole_blocked(arrA, arrX, arrB, n, 8); // Block Size 8
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
   }
