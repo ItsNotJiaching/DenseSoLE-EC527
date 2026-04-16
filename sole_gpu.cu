@@ -67,108 +67,7 @@ __global__ void kernel_mmm_shared (float* a, float* b, float* c, int length) {
   }
 }
 
-// Part 3a: No memory coalescence, but no bank conflicts
-__global__ void kernel_mmm_3a (float* a, float* b, float* c, int length) {
-  __shared__ float a_s[TILE_WIDTH][TILE_WIDTH];
-  __shared__ float b_s[TILE_WIDTH][TILE_WIDTH];
-
-  int bx = blockIdx.x;
-  int by = blockIdx.y;
-  // Transpose thread assignments to break memory coalescence
-  int ty = threadIdx.x;
-  int tx = threadIdx.y;
-
-  int Row = by * TILE_WIDTH + ty;
-  int Col = bx * TILE_WIDTH + tx;
-
-  float tempSum = 0;
-
-  if (Row < length && Col < length) {
-    for (int m = 0; m < length/TILE_WIDTH; ++m) {
-      // Transpose a_s so that when it's being referenced,
-      // There will not be memory bank conflicts
-      a_s[tx][ty] = a[Row*length + (m*TILE_WIDTH + tx)];
-      b_s[ty][tx] = b[Col + (m*TILE_WIDTH + ty)*length];
-      __syncthreads();
-
-      for (int k = 0; k < TILE_WIDTH; ++k) {
-        tempSum += a_s[k][ty] * b_s[k][tx];
-      }
-      __syncthreads();
-    }
-    c[Row*length+Col] = tempSum;
-  }
-}
-
-// Part 3b: Global memory coalescence, but has bank conflicts
-__global__ void kernel_mmm_3b (float* a, float* b, float* c, int length) {
-  __shared__ float a_s[TILE_WIDTH][TILE_WIDTH];
-  __shared__ float b_s[TILE_WIDTH][TILE_WIDTH];
-
-  int bx = blockIdx.x;
-  int by = blockIdx.y;
-  int tx = threadIdx.x;
-  int ty = threadIdx.y;
-
-  int Row = by * TILE_WIDTH + ty;
-  int Col = bx * TILE_WIDTH + tx;
-
-  float tempSum = 0;
-
-  if (Row < length && Col < length) {
-    for (int m = 0; m < length/TILE_WIDTH; ++m) {
-      a_s[ty][tx] = a[Row*length + (m*TILE_WIDTH + tx)];
-      // Transpose the b_s shared memory assignment
-      // This forces a 32-way bank conflict
-      // Since each thread in each warp accesses the same k'th bank
-      b_s[tx][ty] = b[Col + (m*TILE_WIDTH + ty)*length];
-      __syncthreads();
-
-      for (int k = 0; k < TILE_WIDTH; ++k) {
-        tempSum += a_s[ty][k] * b_s[tx][k];
-      }
-      __syncthreads();
-    }
-    c[Row*length+Col] = tempSum;
-  }
-}
-
-// Part 3c: Mess with memory to make it bad!
-__global__ void kernel_mmm_3c (float* a, float* b, float* c, int length) {
-  __shared__ float a_s[TILE_WIDTH][TILE_WIDTH];
-  __shared__ float b_s[TILE_WIDTH][TILE_WIDTH];
-
-  int bx = blockIdx.x;
-  int by = blockIdx.y;
-  // Transpose thread assignments to break memory coalescence
-  int tx = threadIdx.y;
-  int ty = threadIdx.x;
-
-  int Row = by * TILE_WIDTH + ty;
-  int Col = bx * TILE_WIDTH + tx;
-
-  float tempSum = 0;
-
-  if (Row < length && Col < length) {
-    for (int m = 0; m < length/TILE_WIDTH; ++m) {
-      // Transpose the a_s shared memory assignment
-      // This forces a 32-way bank conflict
-      // Since each thread in each warp accesses the same k'th bank
-      a_s[ty][tx] = a[Row*length + (m*TILE_WIDTH + tx)];
-      b_s[ty][tx] = b[Col + (m*TILE_WIDTH + ty)*length];
-      __syncthreads();
-
-      for (int k = 0; k < TILE_WIDTH; ++k) {
-        tempSum += a_s[ty][k] * b_s[k][tx];
-      }
-      __syncthreads();
-    }
-    c[Row*length+Col] = tempSum;
-  }
-}
-
-
-void run_test(int arrLen, int grid_len, int block_len, char option) {
+void test_cuda(int arrLen, int grid_len, int block_len, char option) {
   // GPU Timing variables
   cudaEvent_t start, stop, start_mmm, stop_mmm;
   float elapsed_gpu;
@@ -360,3 +259,11 @@ void run_test(int arrLen, int grid_len, int block_len, char option) {
 //   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, 'c');
 //   return 0;
 // }
+/**
+ * Takes the input data (each size being tested) 
+ */
+void test_cuda(data_t* A, data_t* x, data_t* b, int row_len) {
+  // this acts like GPU's main function kinda
+
+  //
+}
