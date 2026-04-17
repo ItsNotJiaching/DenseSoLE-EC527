@@ -1,4 +1,3 @@
-
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
@@ -17,7 +16,7 @@ void print_array(float* v, int arr_len);
 
 #define NUM_TESTS 15   /* Number of different sizes to test */
 
-#define OPTIONS 3
+#define OPTIONS 2
 
 /**
  * Main Function. Only testing square matrices with array sizes multiple of 8.
@@ -38,9 +37,9 @@ int main(){
   alloc_size_vec = arr_len * arr_len * sizeof(data_t);
 
   // Initalize data arrays
-  float* arrA = (float *) malloc(alloc_size_mat);
-  float* arrX;
-  float* arrB;
+  data_t* arrA = (data_t *) malloc(alloc_size_mat);
+  data_t* arrX = (data_t *) malloc(alloc_size_vec);
+  data_t* arrB = (data_t *) malloc(alloc_size_vec);
 
   // Terminal Output
   printf("Running Dense System of Linear Equations (SoLE) Test ");
@@ -64,6 +63,22 @@ int main(){
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
   }
+
+  printf("row_len, serial_naive, serial_blocked\n");
+  {
+    int i, j;
+    for (i = 0; i < NUM_TESTS; i++) {
+      printf("%ld, ", A*i*i + B*i + C);
+      for (j = 0; j < OPTIONS; j++) {
+        if (j != 0) {
+          printf(", ");
+        }
+        printf("%ld", (long int) (time_stamp[j][i]));
+      }
+      printf("\n");
+    }
+  }
+  printf("\n");
   
   return 0;
 }

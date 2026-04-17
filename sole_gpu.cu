@@ -1,7 +1,7 @@
-
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include "sole_gpu.cuh"
 
 #define TILE_WIDTH        32
 #define TOL            1e-2
