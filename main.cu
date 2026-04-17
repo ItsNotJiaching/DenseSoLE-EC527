@@ -1,12 +1,13 @@
-#include <cstdio>
+#include <stdio.h>
 #include <cstdlib>
 #include <math.h>
+#include <time.h>
 #include "sole_multi.h"
 #include "sole_serial.h"
 #include "sole_gpu.cuh"
 
-void initializeArray1D(float *arr, int len, int seed);
-void print_array(float* v, int arr_len);
+void initializeArray1D(data_t *arr, int len, int seed);
+void print_array(data_t* v, int arr_len);
 
 
 // Let's do multiples of 8 for now
@@ -17,6 +18,69 @@ void print_array(float* v, int arr_len);
 #define NUM_TESTS 15   /* Number of different sizes to test */
 
 #define OPTIONS 2
+
+/* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
+/*
+  As described in the clock_gettime manpage (type "man clock_gettime" at the
+  shell prompt), a "timespec" is a structure that looks like this:
+ 
+        struct timespec {
+          time_t   tv_sec;   // seconds
+          long     tv_nsec;  // and nanoseconds
+        };
+ */
+
+double interval(struct timespec start, struct timespec end)
+{
+  struct timespec temp;
+  temp.tv_sec = end.tv_sec - start.tv_sec;
+  temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+  if (temp.tv_nsec < 0) {
+    temp.tv_sec = temp.tv_sec - 1;
+    temp.tv_nsec = temp.tv_nsec + 1000000000;
+  }
+  return (((double)temp.tv_sec) + ((double)temp.tv_nsec)*1.0e-9);
+}
+/*
+     This method does not require adjusting a #define constant
+
+  How to use this method:
+
+      struct timespec time_start, time_stop;
+      clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
+      // DO SOMETHING THAT TAKES TIME
+      clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
+      measurement = interval(time_start, time_stop);
+
+ */
+
+
+/* -=-=-=-=- End of time measurement declarations =-=-=-=- */
+
+/* This routine "wastes" a little time to make sure the machine gets
+   out of power-saving mode (800 MHz) and switches to normal speed. */
+double wakeup_delay()
+{
+  double meas = 0; int i, j;
+  struct timespec time_start, time_stop;
+  double quasi_random = 0;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
+  j = 100;
+  while (meas < 1.0) {
+    for (i=1; i<j; i++) {
+      /* This iterative calculation uses a chaotic map function, specifically
+         the complex quadratic map (as in Julia and Mandelbrot sets), which is
+         unpredictable enough to prevent compiler optimisation. */
+      quasi_random = quasi_random*quasi_random - 1.923432;
+    }
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
+    meas = interval(time_start, time_stop);
+    j *= 2; /* Twice as much delay next time, until we've taken 1 second */
+  }
+  return quasi_random;
+}
+
+
 
 /**
  * Main Function. Only testing square matrices with array sizes multiple of 8.
@@ -73,17 +137,18 @@ int main(){
         if (j != 0) {
           printf(", ");
         }
-        printf("%ld", (long int) (time_stamp[j][i]));
+        printf("%ld", (long int) (1e9 * time_stamp[j][i]));
       }
       printf("\n");
     }
   }
   printf("\n");
-  
+
+  printf("Wakeup delay computed: %g \n", wakeup_answer);
   return 0;
 }
 
-void init_matrix(float *mat, int len, int seed) {
+void init_matrix(data_t *mat, int len, int seed) {
   int i;
   int max_num = 100; // changes this to initialize with higher numbers
   // float randNum;
@@ -92,11 +157,11 @@ void init_matrix(float *mat, int len, int seed) {
   for (i = 0; i < len*len; i++) {
     // randNum = (float) rand() / RAND_MAX; // let randNum be a random integer
     // mat[i] = randNum;
-    mat[i] = float(rand() % (max_num - 1));
+    mat[i] = data_t(rand() % (max_num - 1));
   }
 }
 
-void print_array(float* v, int arr_len) {
+void print_array(data_t* v, int arr_len) {
   for (int i=0; i < arr_len; i++) {
     for (int j=0; j < arr_len; j++) {
       printf("%.3f ", v[i*arr_len + j]);

@@ -1,5 +1,5 @@
-#include <cstdio>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "sole_serial.h"
 
@@ -15,7 +15,7 @@
  * @return No return; computed outputs are stored in x.
  * @author Owen Jiang
  */
-void sole_serial(data_t* A, data_t* x, data_t* b) {
+void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
     printf("Running Baseline Serial Code: \n");
 }
 
@@ -36,7 +36,7 @@ data_t* transpose(data_t* matrix) {
  * @return No return; computed outputs are stored in x.
  * @author Jiaxing Wang
  */
-void sole_blocked(data_t* A, data_t* x, data_t* b, int B) {
+void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
     printf("Running Baseline Blocked Code: \n");
     // Pseudocode
     /*
