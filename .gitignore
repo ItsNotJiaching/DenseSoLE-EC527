@@ -1,0 +1,6 @@
+# Ignore all files
+*
+# Allow directories so Git can search them
+!*/
+# Allow files with an extension (e.g., .c, .py, .txt)
+!*.*
