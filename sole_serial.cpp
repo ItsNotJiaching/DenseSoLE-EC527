@@ -34,8 +34,8 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
     for (int k = 0; k < row_len; k++) {
         reciprocal = 1/A[k*row_len + k];
         // Compute multipliers and store in lower triangle (L) 
-        for (int i = k + 1; i < row_len; i++) {
-            A[i*row_len + k] *= reciprocal;                  
+        for (int j = k + 1; j < row_len; j++) {
+            A[j*row_len + k] *= reciprocal;                  
         }
         // for all rows below diagonal (U)
         for (int i = k + 1; i < row_len; i++) {
@@ -51,7 +51,7 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
     // see Golub & Van Loan Matrix Computations for full algorithm explanation
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
-        data_t* sum; //intermediatary sum for dot product
+        data_t sum = 0.0; //intermediatary sum for dot product
         for (int j = 0; j < i; j++) //this basically creates L staircase
             sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
         x[i] = b[i] - sum;
@@ -64,10 +64,10 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
     // see Golub & Van Loan Matrix Computations for full algorithm explanation
     for (int i = row_len - 1; i >= 0; i--) {
         data_t* row = &A[i * row_len];
-        data_t* sum; //intermediatary sum for dot product
+        data_t sum = 0.0; //intermediatary sum for dot product
         for (int j = i + 1; j < row_len; j++) //get ahead of diagonal to iterate through U
-            sum += row[j] * x[j]; //upper half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
-        x[i] = b[i] - sum;
+            sum += row[j] * x[j]; //upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
+        x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
 
