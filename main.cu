@@ -87,32 +87,34 @@ double wakeup_delay()
  * (look into -- does SoLE apply to non-square matrices? Pretty sure no)
  */
 int main(){
-  int OPTION;
+  // Initializations for time recording
   struct timespec time_start, time_stop;
   double time_stamp[OPTIONS][NUM_TESTS];
   double wakeup_answer;
-  long int x, n, arr_len;
-  long int alloc_size_vec, alloc_size_mat;
   wakeup_answer = wakeup_delay();
 
+  // Initializations for determining array length
+  long int x, n, arr_len;
   x = NUM_TESTS-1;
   arr_len = A*x*x + B*x + C;
-  alloc_size_mat = arr_len * arr_len * sizeof(data_t);
-  alloc_size_vec = arr_len * arr_len * sizeof(data_t);
 
-  // Initalize data arrays
-  data_t* arrA = (data_t *) malloc(alloc_size_mat);
-  data_t* arrX = (data_t *) malloc(alloc_size_vec);
-  data_t* arrB = (data_t *) malloc(alloc_size_vec);
+  // Initalize data arrays to largest possible (to length arr_len)
+  data_t* arrA = (data_t *) calloc(arr_len * arr_len, sizeof(data_t));
+  data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  data_t* arrB = (data_t *) calloc(arr_len, sizeof(data_t));
+  init_matrix(arrA, arr_len);
+  init_matrix(arrB, arr_len);
 
   // Terminal Output
   printf("Running Dense System of Linear Equations (SoLE) Test ");
   printf("for %d different matrix sizes from %d to %d\n\n", NUM_TESTS, C, arr_len);  
   printf("This may take a while!\n\n");
 
+  int OPTION = 0;
+
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     init_matrix(arrA, n, 42);
-    printf(" OPT %d, iter %ld, size %ld\n", OPTION, x, n);
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
     sole_serial(arrA, arrX, arrB, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
@@ -122,7 +124,7 @@ int main(){
   OPTION++;
 
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    printf(" OPT %d, iter %ld, size %ld\n", OPTION, x, n);
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
     sole_blocked(arrA, arrX, arrB, n, 8); // Block Size 8
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
@@ -143,13 +145,13 @@ int main(){
       printf("\n");
     }
   }
-  printf("\n");
+  printf("Time units: ns\n");
 
   printf("Wakeup delay computed: %g \n", wakeup_answer);
   return 0;
 }
 
-void init_matrix(data_t *mat, int len, int seed) {
+void init_matrix(data_t *mat, int len) {
   int i;
   int max_num = 100; // changes this to initialize with higher numbers
   // float randNum;
