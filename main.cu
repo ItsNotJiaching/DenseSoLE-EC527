@@ -6,7 +6,9 @@
 #include "sole_serial.h"
 #include "sole_gpu.cuh"
 
-void initializeArray1D(data_t *arr, int len);
+void init_matrix(data_t *mat, int len);
+void init_vector(data_t *mat, int len);
+double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
 void print_array(data_t* v, int arr_len);
 
 
@@ -90,6 +92,7 @@ int main(){
   // Initializations for time recording
   struct timespec time_start, time_stop;
   double time_stamp[OPTIONS][NUM_TESTS];
+  double error[OPTIONS][NUM_TESTS];
   double wakeup_answer;
   wakeup_answer = wakeup_delay();
 
@@ -102,8 +105,8 @@ int main(){
   data_t* arrA = (data_t *) calloc(arr_len * arr_len, sizeof(data_t));
   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
   data_t* arrB = (data_t *) calloc(arr_len, sizeof(data_t));
-  init_matrix(arrA, arr_len);
-  init_matrix(arrB, arr_len);
+  data_t* arrA_orig = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  data_t* arrB_orig = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
 
   // Terminal Output
   printf("Running Dense System of Linear Equations (SoLE) Test ");
@@ -113,24 +116,40 @@ int main(){
   int OPTION = 0;
 
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    init_matrix(arrA, n);
+    init_vector(arrB, n);
+
+    //copy originals
+    memcpy(arrA_orig, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_orig, arrB, n*sizeof(data_t));
+
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
     sole_serial(arrA, arrX, arrB, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA_orig,arrX,arrB_orig,n);
   }
 
   OPTION++;
 
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    init_matrix(arrA, n);
+    init_vector(arrB, n);
+
+    //copy originals
+    memcpy(arrA_orig, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_orig, arrB, n*sizeof(data_t));
+
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
-    sole_blocked(arrA, arrX, arrB, n, 8); // Block Size 8
+    sole_blocked(arrA, arrX, arrB, n, 8);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA_orig,arrX,arrB_orig,n);
   }
 
-  printf("row_len, serial_naive, serial_blocked\n");
+  printf("row_len, serial_naive, serial_naive_error, serial_blocked, serial_blocked_error\n");
   {
     int i, j;
     for (i = 0; i < NUM_TESTS; i++) {
@@ -139,7 +158,7 @@ int main(){
         if (j != 0) {
           printf(", ");
         }
-        printf("%ld", (long int) (1e9 * time_stamp[j][i]));
+        printf(", %ld, %e", (long int) (1e9 * time_stamp[j][i]), error[j][i]);
       }
       printf("\n");
     }
@@ -163,6 +182,14 @@ void init_matrix(data_t *mat, int len) {
   }
 }
 
+void init_vector(data_t *vec, int len) {
+  int i;
+  int max_num = 100; // changes this to initialize with higher numbers
+
+  for (i = 0; i < len; i++)
+    vec[i] = data_t(rand() % (max_num-1));
+}
+
 void print_array(data_t* v, int arr_len) {
   for (int i=0; i < arr_len; i++) {
     for (int j=0; j < arr_len; j++) {
@@ -171,4 +198,17 @@ void print_array(data_t* v, int arr_len) {
     printf("\n");
   }
   printf("\n");
+}
+
+// Computes max |Ax - b| using the original A and b. Expect some level of error when dealing with floating types, but it should be consistent across implementations.
+double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n) {
+  double max_err = 0.0;
+  for (int i = 0; i < n; i++) {
+    double ax_i = 0.0;
+    for (int j = 0; j < n; j++)
+      ax_i += (double)arrA[i*n + j] * (double)arrX[j];
+    double err = fabs(ax_i - (double)arrB[i]);
+    if (err > max_err) max_err = err;
+  }
+  return max_err;
 }
