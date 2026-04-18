@@ -27,15 +27,17 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         endfor
         endfor
         endfor
+
+        Note that this example is in-place, so L and U are combined into one matrix.
     */
     data_t reciprocal; //precalculate division for each lower triangle calculation instead of computing division every time
     for (int k = 0; k < row_len; k++) {
         reciprocal = 1/A[k*row_len + k];
-        // Compute multipliers and store in lower triangle
+        // Compute multipliers and store in lower triangle (L) 
         for (int i = k + 1; i < row_len; i++) {
             A[i*row_len + k] *= reciprocal;                  
         }
-        // for all rows below diagonal
+        // for all rows below diagonal (U)
         for (int i = k + 1; i < row_len; i++) {
             for (int j = k + 1; j < row_len; j++) {
                 A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
@@ -43,18 +45,30 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         }
     }
 
-    //forward sub Ly = b
+    //forward sub Ly = b (uses x instead of y for better spatial locality)
+    // L[i][0]*y[0] + L[i][1]*y[1] + ... + L[i][i]*y[i] = b[i], but done in reverse: 
+    // y[i] = b[i] - L[i][0]*y[0] - L[i][1]*y[1] ... because we already calculated y[0] and y[1] in previous passes, we can do this.
+    // see Golub & Van Loan Matrix Computations for full algorithm explanation
     for (int i = 0; i < row_len; i++) {
-        x[i] = b[i];
-        for (int j = 0; j < i; j++)
-            x[i] -= A[i*row_len + j] * x[j];
+        data_t* row = &A[i * row_len];
+        data_t* sum; //intermediatary sum for dot product
+        for (int j = 0; j < i; j++) //this basically creates L staircase
+            sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+        x[i] = b[i] - sum;
+        // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
     }
 
     //back sub Ux = y
+    //U[i][i]*x[i] + U[i][i+1]*x[i+1] + ... + U[i][n]*x[n] = y[i], but done in reverse:  
+    //x[i] = (y[i] - U[i][i+1]*x[i+1] - ... - U[i][n]*x[n]) / U[i][i]   ... because we already calculated y[0] and y[1] in previous passes, we can do this.
+    // see Golub & Van Loan Matrix Computations for full algorithm explanation
     for (int i = row_len - 1; i >= 0; i--) {
-        for (int j = i + 1; j < row_len; j++)
-            x[i] -= A[i*row_len + j] * x[j];
-        x[i] = x[i]/A[i*row_len + i];
+        data_t* row = &A[i * row_len];
+        data_t* sum; //intermediatary sum for dot product
+        for (int j = i + 1; j < row_len; j++) //get ahead of diagonal to iterate through U
+            sum += row[j] * x[j]; //upper half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+        x[i] = b[i] - sum;
+        x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
 
     printf("Running Baseline Serial Code: \n");   
