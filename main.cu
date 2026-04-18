@@ -6,7 +6,7 @@
 #include "sole_serial.h"
 #include "sole_gpu.cuh"
 
-void initializeArray1D(data_t *arr, int len, int seed);
+void init_matrix(data_t *mat, int len, int seed);
 void print_array(data_t* v, int arr_len);
 
 
@@ -17,7 +17,7 @@ void print_array(data_t* v, int arr_len);
 
 #define NUM_TESTS 15   /* Number of different sizes to test */
 
-#define OPTIONS 2
+#define OPTIONS 1
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
 /*
@@ -111,6 +111,7 @@ int main(){
   printf("This may take a while!\n\n");
 
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    init_matrix(arrA, n, 42);
     printf(" OPT %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_start);
     sole_serial(arrA, arrX, arrB, n);

@@ -16,7 +16,48 @@
  * @author Owen Jiang
  */
 void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
-    printf("Running Baseline Serial Code: \n");
+    /*
+            for k ← 0 to N-1 do //loop over all diagonal blocks 
+                for j ← k+1 to N-1 do  //for all blocks in the row of, and to the right of, this diagonal block 
+                    Ak,j ← Ak,j * (Ak,k)-1; //divide by diagonal block 
+                for i ← k+1 to N-1 do  //for all rows below this diagonal block
+                    for j ← k+1 to N-1 do //for all blocks in the corr. row 
+                        Ai,j ← Ai,j - Ai,k* (Ak,j);    
+        endfor
+        endfor
+        endfor
+        endfor
+    */
+    data_t reciprocal; //precalculate division for each lower triangle calculation instead of computing division every time
+    for (int k = 0; k < row_len; k++) {
+        reciprocal = 1/A[k*row_len + k];
+        // Compute multipliers and store in lower triangle
+        for (int i = k + 1; i < row_len; i++) {
+            A[i*row_len + k] *= reciprocal;                  
+        }
+        // for all rows below diagonal
+        for (int i = k + 1; i < row_len; i++) {
+            for (int j = k + 1; j < row_len; j++) {
+                A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
+            }
+        }
+    }
+
+    //forward sub Ly = b
+    for (int i = 0; i < row_len; i++) {
+        x[i] = b[i];
+        for (int j = 0; j < i; j++)
+            x[i] -= A[i*row_len + j] * x[j];
+    }
+
+    //back sub Ux = y
+    for (int i = row_len - 1; i >= 0; i--) {
+        for (int j = i + 1; j < row_len; j++)
+            x[i] -= A[i*row_len + j] * x[j];
+        x[i] = x[i]/A[i*row_len + i];
+    }
+
+    printf("Running Baseline Serial Code: \n");   
 }
 
 data_t* transpose(data_t* matrix) {
