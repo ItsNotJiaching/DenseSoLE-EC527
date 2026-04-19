@@ -3,7 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <omp.h>
-#include "sole_multi.h"
+#include "sole.cuh"
 
 void detect_threads_setting() {
     long int i, ognt;

@@ -2,9 +2,7 @@
 #include <cstdlib>
 #include <math.h>
 #include <time.h>
-#include "sole_multi.h"
-#include "sole_serial.h"
-#include "sole_gpu.cuh"
+#include "sole.cuh"
 
 void init_matrix(data_t *mat, int len);
 void init_vector(data_t *mat, int len);
@@ -158,7 +156,7 @@ int main(){
         if (j != 0) {
           printf(", ");
         }
-        printf(", %ld, %e", (long int) (1e9 * time_stamp[j][i]), error[j][i]);
+        printf("%ld, %e", (long int) (1e9 * time_stamp[j][i]), error[j][i]);
       }
       printf("\n");
     }
@@ -200,7 +198,13 @@ void print_array(data_t* v, int arr_len) {
   printf("\n");
 }
 
-// Computes max |Ax - b| using the original A and b. Expect some level of error when dealing with floating types, but it should be consistent across implementations.
+/**
+ * Computes max |Ax - b| using the original A and b. 
+ * Expect some level of error when dealing with floating types,
+ * but it should be consistent across implementations.
+ * @returns The maximum error |Ax - b| of the data_t data type compared to double.
+ * @author Owen Jiang
+ */
 double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n) {
   double max_err = 0.0;
   for (int i = 0; i < n; i++) {

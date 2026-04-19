@@ -7,7 +7,7 @@ This project explores the implementation and optimization of dense systems of li
 ### Compilation Notes
 To compile:
 
-nvcc -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole
+nvcc -Xcompiler -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole
 
 To request a GPU on the SCC:
 

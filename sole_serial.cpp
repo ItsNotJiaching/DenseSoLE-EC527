@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "sole_serial.h"
+#include "sole.cuh"
 
 /**
  * Serial Baseline. For an array length n, the computational complexity of 
@@ -70,8 +70,6 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
-
-    printf("Running Baseline Serial Code: \n");   
 }
 
 data_t* transpose(data_t* matrix) {
