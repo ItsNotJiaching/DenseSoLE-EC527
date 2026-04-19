@@ -15,7 +15,7 @@ void print_array(data_t* v, int arr_len);
 #define B   8  /* coefficient of x */
 #define C   16  /* constant term */
 
-#define NUM_TESTS 15   /* Number of different sizes to test */
+#define NUM_TESTS 25   /* Number of different sizes to test */
 
 #define OPTIONS 2
 
