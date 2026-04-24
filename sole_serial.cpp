@@ -15,11 +15,21 @@ void print_matrix(data_t* mat, int row_len) {
 }
 
 /**
- * LU Factorization
+ * Serial Baseline. For an array length n, the computational complexity of 
+ * naive LU decomposition is O(n^3), and its dataset size grows at O(n^2).
+ * (Culler 236)
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * 
+ * @return No return; computed outputs are stored in x.
  * @author Owen Jiang
  */
-void factorize(data_t* A, int row_len) {
-    /*
+void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
+
+    /* 
+        LU Factorization: Pseudocode
             for k ← 0 to N-1 do //loop over all diagonal blocks 
                 for j ← k+1 to N-1 do  //for all blocks in the row of, and to the right of, this diagonal block 
                     Ak,j ← Ak,j * (Ak,k)-1; //divide by diagonal block 
@@ -59,22 +69,6 @@ void factorize(data_t* A, int row_len) {
     }
     // printf("Updated Matrix: \n");
     // print_matrix(A, row_len);
-}
-
-/**
- * Serial Baseline. For an array length n, the computational complexity of 
- * naive LU decomposition is O(n^3), and its dataset size grows at O(n^2).
- * (Culler 236)
- * 
- * @param A pointer to input matrix, the A in the Ax=b.
- * @param x pointer to output vector, the x in the Ax=b.
- * @param b pointer to the b in the Ax=b.
- * 
- * @return No return; computed outputs are stored in x.
- * @author Owen Jiang
- */
-void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
-    factorize(A, row_len);
 
     //forward sub Ly = b (uses x instead of y for better spatial locality)
     // L[i][0]*y[0] + L[i][1]*y[1] + ... + L[i][i]*y[i] = b[i], but done in reverse: 
@@ -104,123 +98,16 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
 }
 
 /**
- * Transpose function, ji version as taken from Lab 1.
- */
-data_t* transpose(data_t* matrix, int row_len) {
-    data_t* out = (data_t *) calloc(row_len * row_len, sizeof(data_t));
-    for (int j = 0; j < row_len; j++) {
-        for (int i = 0; i < row_len; i++) {
-        out[j*row_len+i] = matrix[i*row_len+j];
-        }
-    }
-    return out;
-}
-
-/** 
- * Matrix invert function, using Gauss --- Elimination?
- */
-data_t* invert(data_t* matrix, int row_len) {
-    data_t* out = (data_t *) calloc(row_len * row_len, sizeof(data_t));
-    data_t* augmented = (data_t *) calloc(row_len * 2 * row_len, sizeof(data_t));
-
-    // 1. Initialize augmented matrix [A | I]
-    for (int i = 0; i < row_len; i++) {
-        for (int j = 0; j < row_len; j++) {
-            augmented[i*2*row_len+j] = matrix[i*row_len+j];
-            augmented[i*2*row_len+j + row_len] = (i == j) ? 1.0 : 0.0;
-        }
-    }
-
-    // 2. Perform Gauss-Jordan Elimination
-    for (int i = 0; i < row_len; i++) {
-        // --- Partial Pivoting ---
-        int pivotRow = i;
-        for (int k = i + 1; k < row_len; k++) {
-            if (fabs(augmented[k*2*row_len+i]) > fabs(augmented[pivotRow*2*row_len+i]))
-                pivotRow = k;
-        }
-
-        // Swap rows in augmented matrix
-        for (int k = 0; k < 2 * row_len; k++) {
-            double temp = augmented[i*2*row_len+k];
-            augmented[i*2*row_len+k] = augmented[pivotRow*2*row_len+k];
-            augmented[pivotRow*2*row_len+k] = temp;
-        }
-
-        // Check for singularity
-        if (fabs(augmented[i*2*row_len+i]) < 1e-9) {
-            return 0; // Matrix is singular
-        }
-
-        // --- Elimination ---
-        double pivotVal = augmented[i*2*row_len+i];
-        for (int k = 0; k < 2 * row_len; k++) {
-            augmented[i*2*row_len+k] /= pivotVal;
-        }
-
-        for (int j = 0; j < row_len; j++) {
-            if (i != j) {
-                double factor = augmented[j*2*row_len+i];
-                for (int k = 0; k < 2 * row_len; k++) {
-                    augmented[j*2*row_len+k] -= factor * augmented[i*2*row_len+k];
-                }
-            }
-        }
-    }
-
-    // 3. Extract the inverse matrix [I | A^-1]
-    for (int i = 0; i < row_len; i++) {
-        for (int j = 0; j < row_len; j++) {
-            out[i*row_len+j] = augmented[i*2*row_len+j + row_len];
-        }
-    }
-
-    return out;
-}
-
-
-/**
- * MMM function, kij version taken from Lab 1.
-*/
-data_t* mmm(data_t* a, data_t* b, int row_len) {
-    data_t* c = (data_t *) calloc(row_len * row_len, sizeof(data_t));
-    data_t sum;
-
-    for (int k = 0; k < row_len; k++) {
-        for (int i = 0; i < row_len; i++) {
-        sum = a[i*row_len+k];
-            for (int j = 0; j < row_len; j++) {
-                c[i*row_len+j] += sum*b[k*row_len+j];
-            }
-        }
-    }
-    return c;
-}
-
-/**
  * Serial Blocking Optimization.
- * 
  * @param A pointer to input matrix, the A in the Ax=b.
- * @param x pointer to output vector, the x in the Ax=b.
- * @param b pointer to the b in the Ax=b.
- * @param B block size
- * 
- * @return No return; computed outputs are stored in x.
- * @author Jiaxing Wang
- */
-/**
- * Corrected Serial Blocking Optimization for LU Decomposition.
- * * @param A pointer to input matrix, the A in the Ax=b.
  * @param x pointer to output vector, the x in the Ax=b.
  * @param b pointer to the b in the Ax=b.
  * @param B block size
  */
 void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
-    int N = row_len / B;
-
+    int N = row_len / B; // N blocks in array
     // Part 1: Block LU Factorization
     for (int k = 0; k < N; k++) {
-        
         // Step A: Factorize diagonal block A_{k, k} (Computes L_kk and U_kk in place)
         for (int kk = k * B; kk < k * B + B; kk++) {
             data_t reciprocal = 1.0 / A[kk * row_len + kk];
@@ -278,6 +165,7 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
     }
 
     // Part 2: Forward and Backward Substitution
+    // Same as in fully serial code
     // Forward substitution: Ly = b
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
@@ -299,12 +187,3 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
         x[i] = x[i] / row[i]; 
     }
 }
-
-/*
-Jiaxing Notes
- - blocking preserves memory locality (Culler 237)
- - interleaving & partitioning by scatter decomposition helps alleviates load balance (Culler 237)
-    - DOES NOT SOLVE it though
- - test to find ideal block size; B=16, B=32 advised to be good for parallelism (Culler 238)
-
-*/

@@ -21,22 +21,6 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
   }
 }
 
-// Part 1: MMM using global memory only.
-__global__ void kernel_mmm_global (float* a, float* b, float* c, int length) {
-  int Row = blockIdx.y * TILE_WIDTH + threadIdx.y; // row number
-  int Col = blockIdx.x * TILE_WIDTH + threadIdx.x; // column number
-
-  float tempSum = 0;
-
-  if (Row < length && Col < length) { // compute only if not out of bounds
-    // each iteration computes one value of C array (one row dotted with one col)
-    for (int k = 0; k < length; ++k) { 
-      tempSum += a[Row*length + k] * b[k*length+Col];
-    }
-    c[Row*length+Col] = tempSum;
-  }
-}
-
 // Part 2: MMM using shared memory
 __global__ void kernel_mmm_shared (float* a, float* b, float* c, int length) {
   __shared__ float a_s[TILE_WIDTH][TILE_WIDTH];

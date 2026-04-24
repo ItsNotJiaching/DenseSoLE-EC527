@@ -9,8 +9,15 @@ To compile:
 
 nvcc -Xcompiler -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole
 
+Try -O1 optimization later
+
+To Run:
+OMP_NUM_THREADS=4 ./test_sole
+
 To request a GPU on the SCC:
 
 qrsh -l gpus=1 -l gpu_type=P100 -P ec527
 
 This will request a 6.0 compute GPU.
+
+Make sure to do "module load cuda" to get access to the nvcc compiler.
