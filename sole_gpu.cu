@@ -1,13 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include <omp.h>
 #include "sole.cuh"
 
-#define TILE_WIDTH        32
-#define TOL            1e-2
-
 #define IMUL(a, b) __mul24(a, b)
-
 
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
@@ -21,205 +18,98 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
   }
 }
 
-// Part 2: MMM using shared memory
-__global__ void kernel_mmm_shared (float* a, float* b, float* c, int length) {
-  __shared__ float a_s[TILE_WIDTH][TILE_WIDTH];
-  __shared__ float b_s[TILE_WIDTH][TILE_WIDTH];
-
-  int bx = blockIdx.x;
-  int by = blockIdx.y;
-  int tx = threadIdx.x;
-  int ty = threadIdx.y;
-
-  int Row = by * TILE_WIDTH + ty;
-  int Col = bx * TILE_WIDTH + tx;
-
-  float tempSum = 0;
-
-  if (Row < length && Col < length) {
-    for (int m = 0; m < length/TILE_WIDTH; ++m) {
-      a_s[ty][tx] = a[Row*length + (m*TILE_WIDTH + tx)];
-      b_s[ty][tx] = b[Col + (m*TILE_WIDTH + ty)*length];
-      __syncthreads();
-
-      for (int k = 0; k < TILE_WIDTH; ++k) {
-        tempSum += a_s[ty][k] * b_s[k][tx];
-      }
-      __syncthreads();
+void print_mat(data_t* mat, int row_len) {
+  for (int i=0; i < row_len; i++) {
+    for (int j=0; j < row_len; j++) {
+      printf("%.3f ", mat[i*row_len + j]);
     }
-    c[Row*length+Col] = tempSum;
+    printf("\n");
+  }
+  printf("\n");
+}
+
+__global__ void kernel_lu_step(data_t* A, int k, int row_len) {
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  int row = k + 1 + tid;
+  if (row >= row_len) return;
+  
+  // Compute Lower Triangular
+  A[row*row_len + k] = A[row*row_len + k] /A[k*row_len + k];
+
+  // Compute Upper Triangular
+  for (int j = k+1; j < row_len; j++) {
+    A[row*row_len + j] -= A[row*row_len + k] * A[k*row_len + j];
   }
 }
 
-// void test_cuda(int arrLen, int grid_len, int block_len, char option) {
-//   // GPU Timing variables
-//   cudaEvent_t start, stop, start_mmm, stop_mmm;
-//   float elapsed_gpu;
-
-//   // Arrays on GPU global memory
-//   float *d_A, *d_B, *d_C;
-
-//   // Arrays on the host memory
-//   float *h_A, *h_B, *h_C, *h_C_dev;
-
-//   int i, errCount = 0, zeroCount = 0;
-//   size_t allocSize = arrLen * arrLen * sizeof(float);
-
-//   // printf("Length of the array = %d\n", arrLen);
-
-//   // Allocate GPU memory
-//   CUDA_SAFE_CALL(cudaMalloc((void **)&d_A, allocSize));
-//   CUDA_SAFE_CALL(cudaMalloc((void **)&d_B, allocSize));
-//   CUDA_SAFE_CALL(cudaMalloc((void **)&d_C, allocSize));
-
-//   // Allocate arrays on host memory
-//   h_A                    = (float *) malloc(allocSize);
-//   h_B                    = (float *) malloc(allocSize);
-//   h_C                    = (float *) malloc(allocSize);
-//   h_C_dev                = (float *) malloc(allocSize);
-//   memset(h_C, 0, allocSize);
-
-//   // Initialize the host arrays
-//   // printf("\nInitializing the arrays ...");
-//   // Arrays are initialized with a known seed for reproducability
-//   initializeArray1D(h_A, arrLen, 456);
-//   initializeArray1D(h_B, arrLen, 123);
-//   // printf("\t... done\n\n");
-
-//   // Pre-compute array check
-//   // printf("Initial Array:\n");
-//   // printf("CPU:\n");
-//   // print_array(h_A, arrLen);
-//   // print_array(h_B, arrLen);
-//   // print_array(h_C, arrLen);
-//   // printf("GPU:\n");
-//   // print_array(h_A, arrLen);
-
-//   dim3 dimGrid(grid_len, grid_len);
-//   dim3 dimBlock(block_len, block_len);
-//   printf("Array Size: %dx%d | Block Size: %dx%d | Grid Size: %dx%d\n", 
-//           arrLen, arrLen, block_len, block_len, grid_len, grid_len);
-
-
-//   // Timer for End-to-End Operation
-//   cudaEventCreate(&start);
-//   cudaEventCreate(&stop);
-//   // Record event on the default stream
-//   cudaEventRecord(start, 0);
-
-//   // Transfer the arrays to the GPU memory
-//   CUDA_SAFE_CALL(cudaMemcpy(d_A, h_A, allocSize, cudaMemcpyHostToDevice));
-//   CUDA_SAFE_CALL(cudaMemcpy(d_B, h_B, allocSize, cudaMemcpyHostToDevice));
-
-//   // Timer only for MMM Computation
-//   cudaEventCreate(&start_mmm);
-//   cudaEventCreate(&stop_mmm);
-//   // Record event on the default stream
-//   cudaEventRecord(start_mmm, 0);
-
-//   // Launch the kernel
-//   if (option == '1') {
-//     kernel_mmm_global<<<dimGrid, dimBlock>>>(d_A, d_B, d_C, arrLen);
-//   }
-//   else if (option == '2') {
-//     kernel_mmm_shared<<<dimGrid, dimBlock>>>(d_A, d_B, d_C, arrLen);
-//   }
-
-//   // Stop and destroy the timer
-//   cudaEventRecord(stop_mmm,0);
-//   cudaEventSynchronize(stop_mmm);
-//   cudaEventElapsedTime(&elapsed_gpu, start_mmm, stop_mmm);
-//   printf("GPU MMM Only time: %f (msec)\n", elapsed_gpu);
-//   cudaEventDestroy(start_mmm);
-//   cudaEventDestroy(stop_mmm);
-
-//   // Check for errors during launch
-//   CUDA_SAFE_CALL(cudaPeekAtLastError());
-
-//   // Transfer the results back to the host
-//   CUDA_SAFE_CALL(cudaMemcpy(h_C_dev, d_C, allocSize, cudaMemcpyDeviceToHost));
-
-
-//   // Stop and destroy the timer
-//   cudaEventRecord(stop,0);
-//   cudaEventSynchronize(stop);
-//   cudaEventElapsedTime(&elapsed_gpu, start, stop);
-//   printf("GPU End-to-End time: %f (msec)\n", elapsed_gpu);
-//   cudaEventDestroy(start);
-//   cudaEventDestroy(stop);
-
-//   // Results:
-//   // printf("Initial Array:\n");
-//   // printf("CPU:\n");
-//   // print_array(h_A, arrLen);
-//   // print_array(h_B, arrLen);
-//   // print_array(h_C, arrLen);
-
-//   // Compare the results
-//   float errTotal = 0;
-//   for(i = 0; i < arrLen*arrLen; i++) {
-//     if (abs(h_C_dev[i] - h_C[i]) > TOL) {
-//       errCount++;
-//       errTotal += abs(h_C_dev[i] - h_C[i]);
-//     }
-//     if (h_C_dev[i] == 0) {
-//       zeroCount++;
-//     }
-//   }
-
-//   // printf("\nGPU Results:\n");
-//   // print_array(h_C_dev, arrLen);
-
-//   if (errCount > 0) {
-//     printf("\n@ERROR: TEST FAILED: %d results did not match\n", errCount);
-//     printf("Total error is %.3f\n", errTotal);
-//   }
-//   else if (zeroCount > 0){
-//     printf("\n@ERROR: TEST FAILED: %d results (from GPU) are zero\n", zeroCount);
-//   }
-//   else {
-//     printf("TEST PASSED: All results matched\n");
-//   }
-
-//   // Free-up device and host memory
-//   CUDA_SAFE_CALL(cudaFree(d_A));
-//   CUDA_SAFE_CALL(cudaFree(d_B));
-//   CUDA_SAFE_CALL(cudaFree(d_C));
-
-//   free(h_A); free(h_B); free(h_C); free(h_C_dev);
-// }
-
-
-// int main(int argc, char **argv){
-//   // Select GPU
-//   CUDA_SAFE_CALL(cudaSetDevice(0));
-  
-//   printf("\nRunning Part 1\n");
-//   run_test(1024, 1024/TILE_WIDTH, TILE_WIDTH, '1');
-//   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, '1');
-
-//   printf("\nRunning Part 2\n");
-//   run_test(1024, 1024/TILE_WIDTH, TILE_WIDTH, '2');
-//   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, '2');
-
-//   printf("\nRunning Part 3a\n");
-//   run_test(1024, 1024/TILE_WIDTH, TILE_WIDTH, 'a');
-//   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, 'a');
-
-//   printf("\nRunning Part 3b\n");
-//   run_test(1024, 1024/TILE_WIDTH, TILE_WIDTH, 'b');
-//   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, 'b');
-
-//   printf("\nRunning Part 3c\n");
-//   run_test(1024, 1024/TILE_WIDTH, TILE_WIDTH, 'c');
-//   run_test(2048, 2048/TILE_WIDTH, TILE_WIDTH, 'c');
-//   return 0;
-// }
 /**
  * Takes the input data (each size being tested) 
  */
-void test_cuda(data_t* A, data_t* x, data_t* b, int row_len) {
-  // this acts like GPU's main function kinda
+void sole_cuda(data_t* A, data_t* x, data_t* b, int row_len, int grid_len, int block_len) {
+  // Select GPU
+  CUDA_SAFE_CALL(cudaSetDevice(0));
 
-  //
+  // Arrays on GPU global memory
+  data_t *A_GPU;
+  size_t matSize = row_len * row_len * sizeof(data_t);
+  // Allocate GPU memory
+  CUDA_SAFE_CALL(cudaMalloc((void **)&A_GPU, matSize));
+
+  // Transfer the arrays to the GPU memory
+  CUDA_SAFE_CALL(cudaMemcpy(A_GPU, A, matSize, cudaMemcpyHostToDevice));
+
+  // Pre-compute array check
+  // printf("Initial Host Array:\n");
+  // print_mat(A, row_len);
+  // print_mat(x_GPU, row_len);
+  // print_mat(b_GPU, row_len);
+
+  // Grid and Block Dimensions, Terminal Output
+  dim3 dimGrid(grid_len, grid_len);
+  dim3 dimBlock(block_len, block_len);
+  // printf("Array Size: %dx%d | Block Size: %dx%d | Grid Size: %dx%d\n", 
+  //         row_len, row_len, block_len, block_len, grid_len, grid_len);
+  
+  // Launch the kernel
+  // One kernel per pivot step — CUDA serializes launches on same stream
+  for (int k = 0; k < row_len - 1; k++) {
+    int rows_remaining = row_len - k - 1;    // threads needed = rows below pivot
+    int blockSize = 1024;
+    int gridSize = (rows_remaining + blockSize - 1) / blockSize;
+
+    kernel_lu_step<<<gridSize, blockSize>>>(A_GPU, k, row_len);
+
+    CUDA_SAFE_CALL(cudaPeekAtLastError());
+  }
+
+  // Transfer the results back to the host
+  CUDA_SAFE_CALL(cudaMemcpy(A, A_GPU, matSize, cudaMemcpyDeviceToHost));
+
+  // print_mat(A, row_len);
+
+  // forward sub Ly = b (uses x instead of y for better spatial locality)
+  for (int i = 0; i < row_len; i++) {
+      data_t* row = &A[i * row_len];
+      data_t sum = 0.0; //intermediatary sum for dot product
+      #pragma omp parallel for reduction(-:sum)
+      for (int j = 0; j < i; j++) //this basically creates L staircase
+          sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+      x[i] = b[i] - sum;
+      // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
+  }
+
+  //back sub Ux = y
+  for (int i = row_len - 1; i >= 0; i--) {
+      data_t* row = &A[i * row_len];
+      data_t sum = 0.0; //intermediatary sum for dot product
+      #pragma omp parallel for reduction(-:sum)
+      for (int j = i + 1; j < row_len; j++) //get ahead of diagonal to iterate through U
+          sum += row[j] * x[j]; //upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
+      x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
+      x[i] = x[i]/row[i]; //divide by diagonal per the formula 
+  }
+
+  // Free-up device and host memory
+  CUDA_SAFE_CALL(cudaFree(A_GPU));
 }

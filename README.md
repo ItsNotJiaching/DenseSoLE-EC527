@@ -12,7 +12,7 @@ nvcc -Xcompiler -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o t
 Try -O1 optimization later
 
 To Run:
-OMP_NUM_THREADS=4 ./test_sole
+OMP_NUM_THREADS=8,4 ./test_sole
 
 To request a GPU on the SCC:
 
