@@ -42,6 +42,8 @@ void detect_threads_setting() {
  */
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
     // LU Decomposition
+    timespec time_start, time_stop, time_stamp;
+    clock_gettime(CLOCK_REALTIME, &time_start);
     #pragma omp parallel
     {
         data_t reciprocal;
@@ -54,15 +56,18 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
                 A[j*row_len + k] *= reciprocal;                  
             }
 
-            // for all rows below diagonal (U)
+            // updating trailing submatrix (schular)
             #pragma omp for schedule(static)
             for (int i = k + 1; i < row_len; i++) {
                 for (int j = k + 1; j < row_len; j++) {
-                    A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
+                    A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j]; //A[i][j] = A[i][j] - A[i][k] * A[k][i]
                 }
             }
         }
     }
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing in OpenMP: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    clock_gettime(CLOCK_REALTIME, &time_start);
 
     // forward sub Ly = b (uses x instead of y for better spatial locality)
     for (int i = 0; i < row_len; i++) {
@@ -85,6 +90,82 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing subs: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+}
+
+/**
+ * OpenMP Version of the base serial code (sole_serial) using Static Load Assignment, But doing an "inverse load"
+ * Group from outside in i.e. (first thread and last thread in one cluster, second thread and second to last thread, etc.)
+ * @author Owen Jiang
+ */
+void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
+    // LU Decomposition
+    timespec time_start, time_stop, time_stamp;
+    clock_gettime(CLOCK_REALTIME, &time_start);
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int num_threads = omp_get_num_threads(); 
+
+        data_t reciprocal;
+        for (int k = 0; k < row_len; k++) {
+            reciprocal = 1/A[k*row_len + k];
+
+            // Compute multipliers and store in lower triangle (L) 
+            #pragma omp for schedule(static)
+            for (int j = k + 1; j < row_len; j++) {
+                A[j*row_len + k] *= reciprocal;                  
+            }
+
+            int remaining_rows = row_len - (k + 1);
+
+           #pragma omp for schedule(static)
+            for (int m = 0; m < remaining_rows; m++) { //Gausssian 
+                int i;
+                // if m is even take from top, if m is odd take from bottom.
+                if (m % 2 == 0) {
+                    i = (k + 1) + (m / 2);
+                } else {
+                    i = (row_len - 1) - (m / 2);
+                }
+                // Standard inner loop update
+                data_t* row_i = &A[i * row_len];
+                data_t* row_k = &A[k * row_len];
+                data_t multiplier = row_i[k];
+
+                for (int j = k + 1; j < row_len; j++) {
+                    row_i[j] -= multiplier * row_k[j];
+                }
+            }
+        }
+    }
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing in OpenMP: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    clock_gettime(CLOCK_REALTIME, &time_start);
+    // forward sub Ly = b (uses x instead of y for better spatial locality)
+    for (int i = 0; i < row_len; i++) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0; //intermediatary sum for dot product
+        #pragma omp parallel for reduction(-:sum)
+        for (int j = 0; j < i; j++) //this basically creates L staircase
+            sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+        x[i] = b[i] - sum;
+        // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
+    }
+
+    //back sub Ux = y
+    for (int i = row_len - 1; i >= 0; i--) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0; //intermediatary sum for dot product
+        #pragma omp parallel for reduction(-:sum)
+        for (int j = i + 1; j < row_len; j++) //get ahead of diagonal to iterate through U
+            sum += row[j] * x[j]; //upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
+        x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
+        x[i] = x[i]/row[i]; //divide by diagonal per the formula 
+    }
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing subs: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
 }
 
 void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {

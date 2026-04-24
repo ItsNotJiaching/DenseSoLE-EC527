@@ -86,25 +86,26 @@ int main(){
   printf("This may take a while!\n\n");
 
   int OPTION = 0;
+  printf("Running OMP naive");
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
-
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
 
   // OPTION++;
   
+  // printf("Running OMP balanced!")
   // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
   //   //copy originals
   //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -123,21 +124,22 @@ int main(){
 
   // OPTION++;
   
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // printf("Running CUDA!");
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_cuda(arrA_copy, arrX, arrB_copy, n, 1, 32);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_cuda(arrA_copy, arrX, arrB_copy, n, 1, 32);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
   
   printf("row_len, omp_naive, omp_naiveerror, "
         "omp_balanced, omp_balanced_error, "
