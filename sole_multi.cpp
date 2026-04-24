@@ -5,6 +5,19 @@
 #include <omp.h>
 #include "sole.cuh"
 
+/* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
+double measure(struct timespec start, struct timespec end)
+{
+  struct timespec temp;
+  temp.tv_sec = end.tv_sec - start.tv_sec;
+  temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+  if (temp.tv_nsec < 0) {
+    temp.tv_sec = temp.tv_sec - 1;
+    temp.tv_nsec = temp.tv_nsec + 1000000000;
+  }
+  return (((double)temp.tv_sec) + ((double)temp.tv_nsec)*1.0e-9);
+}
+
 void detect_threads_setting() {
     long int i, ognt;
     char * env_ONT;
@@ -41,6 +54,10 @@ void detect_threads_setting() {
  * @author Jiaxing Wang
  */
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
+    // Record LU Decomposition Only time
+    struct timespec time_start, time_stop;
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+
     // LU Decomposition
     #pragma omp parallel
     {
@@ -63,6 +80,10 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    double final_time = measure(time_start, time_stop);
+    printf("OMP Naive LU Decomp Time: %.2f ms\n", 1e3*final_time);
 
     // forward sub Ly = b (uses x instead of y for better spatial locality)
     for (int i = 0; i < row_len; i++) {

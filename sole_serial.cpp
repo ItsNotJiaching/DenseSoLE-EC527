@@ -58,9 +58,9 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         // print_matrix(A, row_len);
 
         // for all rows below diagonal (U)
-        for (int i = k + 1; i < row_len; i++) {
-            for (int j = k + 1; j < row_len; j++) {
-                A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
+        for (int j = k + 1; j < row_len; j++) {
+            for (int i = k + 1; i < row_len; i++) {
+                A[j*row_len + i] -= A[j*row_len + k] * A[k*row_len + i];     
             }
         }
 
