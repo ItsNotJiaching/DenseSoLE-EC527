@@ -175,7 +175,7 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
         data_t sum = 0.0; 
         for (int j = 0; j < i; j++) {
             sum += row[j] * x[j]; 
-        }
+        } 
         x[i] = b[i] - sum;
     }
 
