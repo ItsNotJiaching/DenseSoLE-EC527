@@ -102,13 +102,16 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
  * @param A pointer to input matrix, the A in the Ax=b.
  * @param x pointer to output vector, the x in the Ax=b.
  * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
  * @param B block size
+ * 
+ * @author Jiaxing Wang
  */
 void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
     int N = row_len / B; // N blocks in array
-    // Part 1: Block LU Factorization
+    // Part 1: Block LU Decomposition
     for (int k = 0; k < N; k++) {
-        // Step A: Factorize diagonal block A_{k, k} (Computes L_kk and U_kk in place)
+        // LU Decomposition of diagonal block A_{k, k} (Computes L_kk and U_kk in place)
         for (int kk = k * B; kk < k * B + B; kk++) {
             data_t reciprocal = 1.0 / A[kk * row_len + kk];
             // Compute multipliers for the block
@@ -124,7 +127,7 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
             }
         }
 
-        // Step B: Update block row (Computes U_{k, j} using forward substitution)
+        // Forward pass to update block row (computes U_{k, j})
         for (int j = k + 1; j < N; j++) {
             for (int kk = k * B; kk < k * B + B; kk++) {
                 for (int i = kk + 1; i < k * B + B; i++) {
@@ -135,7 +138,7 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
             }
         }
 
-        // Step C: Update block column (Computes L_{i, k} using backward substitution)
+        // Backward pass to update block column (computes L_{i, k})
         for (int i = k + 1; i < N; i++) {
             for (int kk = k * B; kk < k * B + B; kk++) {
                 data_t reciprocal = 1.0 / A[kk * row_len + kk];
@@ -148,10 +151,10 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
             }
         }
 
-        // Step D: Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
+        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
         for (int i = k + 1; i < N; i++) {
             for (int j = k + 1; j < N; j++) {
-                // Highly cache-friendly MMM loop (kij ordering)
+                // kij ordering to optimize for cache
                 for (int ii = i * B; ii < i * B + B; ii++) {
                     for (int kk = k * B; kk < k * B + B; kk++) {
                         data_t temp = A[ii * row_len + kk];

@@ -7,12 +7,10 @@ This project explores the implementation and optimization of dense systems of li
 ### Compilation Notes
 To compile:
 
-nvcc -Xcompiler -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole
-
-Try -O1 optimization later
+nvcc -O1 -Xcompiler -fopenmp main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole
 
 To Run:
-OMP_NUM_THREADS=8,4 ./test_sole
+OMP_NUM_THREADS=8,3 ./test_sole
 
 To request a GPU on the SCC:
 

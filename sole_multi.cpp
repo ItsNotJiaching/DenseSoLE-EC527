@@ -66,7 +66,7 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
         }
     }
     clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing in OpenMP: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
     clock_gettime(CLOCK_REALTIME, &time_start);
 
     // forward sub Ly = b (uses x instead of y for better spatial locality)
@@ -91,7 +91,7 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
     clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing subs: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
 }
 
 /**
@@ -121,7 +121,7 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
             int remaining_rows = row_len - (k + 1);
 
            #pragma omp for schedule(static)
-            for (int m = 0; m < remaining_rows; m++) { //Gausssian 
+            for (int m = 0; m < remaining_rows; m++) { //Gaussian 
                 int i;
                 // if m is even take from top, if m is odd take from bottom.
                 if (m % 2 == 0) {
@@ -141,7 +141,7 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
         }
     }
     clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing in OpenMP: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    printf("Time spent computing in OpenMP: %f\n", 1.0e3 * interval(time_start, time_stop));
     clock_gettime(CLOCK_REALTIME, &time_start);
     // forward sub Ly = b (uses x instead of y for better spatial locality)
     for (int i = 0; i < row_len; i++) {
@@ -165,17 +165,17 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
     clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing subs: %10.4g", (double)2.0 * 1.0e9 * interval(time_start, time_stop));
+    printf("Time spent computing subs: %f\n", 1.0e3 * interval(time_start, time_stop));
 }
 
 void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
     int B = 32; // Block size
     int N = row_len / B;
 
-    // Part 1: Block LU Factorization
+    // Block LU Decomposition
     for (int k = 0; k < N; k++) {
         
-        // Step A: Factorize diagonal block (SERIAL)
+        // LU Decomposition for diagonal blocks
         for (int kk = k * B; kk < k * B + B; kk++) {
             data_t reciprocal = 1.0 / A[kk * row_len + kk];
             for (int i = kk + 1; i < k * B + B; i++) {
@@ -188,7 +188,7 @@ void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
 
-        // Step B: Update block row (MANUAL ATOMIC QUEUE)
+        // Update block row (MANUAL ATOMIC QUEUE)
         int shared_j_counter = k + 1;
         #pragma omp parallel 
         {
@@ -213,7 +213,7 @@ void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
 
-        // Step C: Update block column (MANUAL ATOMIC QUEUE)
+        // Update block column (MANUAL ATOMIC QUEUE)
         int shared_i_counter_c = k + 1;
         #pragma omp parallel 
         {
@@ -240,7 +240,7 @@ void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
 
-        // Step D: Schur Complement Update (MANUAL ATOMIC QUEUE)
+        // Schur Complement Update (MANUAL ATOMIC QUEUE)
         int shared_i_counter_d = k + 1;
         #pragma omp parallel 
         {
@@ -269,7 +269,7 @@ void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
         }
     }
 
-    // Part 2: Substitution (SERIAL)
+    // Forward and backward sub (SERIAL)
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
         data_t sum = 0.0; 
