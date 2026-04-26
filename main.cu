@@ -103,23 +103,23 @@ int main(){
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  OPTION++;
+  // OPTION++;
   
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_omp_balanced(arrA_copy, arrX, arrB_copy, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_omp_balanced(arrA_copy, arrX, arrB_copy, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
   OPTION++;
   
@@ -139,23 +139,23 @@ int main(){
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  // OPTION++;
+  OPTION++;
   
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_serial(arrA_copy, arrX, arrB_copy, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_serial(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
 
   // OPTION++;
   
@@ -178,8 +178,8 @@ int main(){
   
   
   printf("row_len, omp_naive, omp_naive_error, "
-        "omp_balanced, omp_balanced_error, "
-        "cuda, cuda_error\n");
+        "cuda, omp_balanced_error, "
+        "serial_naive, cuda_error\n");
         // "serial_naive, serial_naive_error, "
         // "serial_blocked, serial_blocked_error\n");
   int i, j;
@@ -189,11 +189,11 @@ int main(){
       if (j != 0) {
         printf(", ");
       }
-      printf("%.3f, %e", (double) (1e3 * time_stamp[j][i]), error[j][i]);
+      printf("%f, %e", (double) (1e9 * time_stamp[j][i]), error[j][i]);
     }
     printf("\n");
   }
-  printf("Time units: ms\n");
+  printf("Time units: ns\n");
 
   printf("Wakeup delay computed: %g \n", wakeup_answer);
   return 0;
