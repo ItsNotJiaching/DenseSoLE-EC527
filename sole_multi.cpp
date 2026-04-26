@@ -183,118 +183,112 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
     printf("Time spent computing subs: %f\n", 1.0e3 * interval(time_start, time_stop));
 }
 
-void sole_omp_balanced(data_t* A, data_t* x, data_t* b, int row_len) {
-    int B = 32; // Block size
-    int N = row_len / B;
+/**
+ * OpenMP Version with load balancing
+ * Used collapse(2) in LU Decomposition to merge schular submatrix
+ * Optimized small loops handling and shared sum management w/ explicit reset via single
+ * @author Alvin Yan
+ */
+void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {
+    // Record LU Decomposition Only time
+    struct timespec time_start, time_stop;
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
 
-    // Block LU Decomposition
-    for (int k = 0; k < N; k++) {
-        
-        // LU Decomposition for diagonal blocks
-        for (int kk = k * B; kk < k * B + B; kk++) {
-            data_t reciprocal = 1.0 / A[kk * row_len + kk];
-            for (int i = kk + 1; i < k * B + B; i++) {
-                A[i * row_len + kk] *= reciprocal;
+    // LU Decomposition
+    #pragma omp parallel
+    {
+        data_t reciprocal;
+        for (int k = 0; k < row_len; k++) {
+            reciprocal = 1/A[k*row_len + k];
+
+            // Compute multipliers and store in lower triangle (L) 
+            #pragma omp for schedule(static)
+            for (int j = k + 1; j < row_len; j++) {
+                A[j*row_len + k] *= reciprocal;                  
             }
-            for (int i = kk + 1; i < k * B + B; i++) {
-                for (int j = kk + 1; j < k * B + B; j++) {
-                    A[i * row_len + j] -= A[i * row_len + kk] * A[kk * row_len + j];
-                }
-            }
-        }
 
-        // Update block row (MANUAL ATOMIC QUEUE)
-        int shared_j_counter = k + 1;
-        #pragma omp parallel 
-        {
-            int my_j;
-            while (true) {
-                // Ticket Dispenser
-                #pragma omp atomic capture
-                {
-                    my_j = shared_j_counter;
-                    shared_j_counter++;
-                }
-                
-                if (my_j >= N) break; // Queue is empty, thread exits loop
-
-                for (int kk = k * B; kk < k * B + B; kk++) {
-                    for (int i = kk + 1; i < k * B + B; i++) {
-                        for (int jj = my_j * B; jj < my_j * B + B; jj++) {
-                            A[i * row_len + jj] -= A[i * row_len + kk] * A[kk * row_len + jj];
-                        }
-                    }
-                }
-            }
-        }
-
-        // Update block column (MANUAL ATOMIC QUEUE)
-        int shared_i_counter_c = k + 1;
-        #pragma omp parallel 
-        {
-            int my_i;
-            while (true) {
-                // Ticket Dispenser
-                #pragma omp atomic capture
-                {
-                    my_i = shared_i_counter_c;
-                    shared_i_counter_c++;
-                }
-                
-                if (my_i >= N) break;
-
-                for (int kk = k * B; kk < k * B + B; kk++) {
-                    data_t reciprocal = 1.0 / A[kk * row_len + kk];
-                    for (int ii = my_i * B; ii < my_i * B + B; ii++) {
-                        A[ii * row_len + kk] *= reciprocal;
-                        for (int j = kk + 1; j < k * B + B; j++) {
-                            A[ii * row_len + j] -= A[ii * row_len + kk] * A[kk * row_len + j];
-                        }
-                    }
-                }
-            }
-        }
-
-        // Schur Complement Update (MANUAL ATOMIC QUEUE)
-        int shared_i_counter_d = k + 1;
-        #pragma omp parallel 
-        {
-            int my_i;
-            while (true) {
-                // Ticket Dispenser
-                #pragma omp atomic capture
-                {
-                    my_i = shared_i_counter_d;
-                    shared_i_counter_d++;
-                }
-                
-                if (my_i >= N) break;
-
-                for (int j = k + 1; j < N; j++) {
-                    for (int ii = my_i * B; ii < my_i * B + B; ii++) {
-                        for (int kk = k * B; kk < k * B + B; kk++) {
-                            data_t temp = A[ii * row_len + kk];
-                            for (int jj = j * B; jj < j * B + B; jj++) {
-                                A[ii * row_len + jj] -= temp * A[kk * row_len + jj];
-                            }
-                        }
-                    }
+            // updating trailing submatrix (schular)
+            #pragma omp for schedule(static) collapse(2)
+            // collapse(2) merges i and j loops into one workload, reduces underutilization
+            // k=row_len-2: 1×1 = 1   unit  --> 1 thread works,  7 idle 
+            // k=row_len-4: 3×3 = 9   units --> 8 threads work,  0 idle
+            // k=row_len-9: 8×8 = 64  units --> 8 threads work,  0 idle
+            for (int i = k + 1; i < row_len; i++) {
+                for (int j = k + 1; j < row_len; j++) {
+                    A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j]; //A[i][j] = A[i][j] - A[i][k] * A[k][i]
                 }
             }
         }
     }
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+    clock_gettime(CLOCK_REALTIME, &time_start);
 
-    // Forward and backward sub (SERIAL)
-    for (int i = 0; i < row_len; i++) {
-        data_t* row = &A[i * row_len];
-        data_t sum = 0.0; 
-        for (int j = 0; j < i; j++) sum += row[j] * x[j]; 
-        x[i] = b[i] - sum;
+    int nthreads = omp_get_max_threads();
+    const int THRESHOLD = nthreads * 2;
+
+    // Shared accumulator for reductions inside the persistent region
+    // Must be zeroed before each row's reduction
+    data_t sum = 0.0;
+
+    #pragma omp parallel shared(sum)
+    {
+        // Forward substitution: Ly = b
+        for (int i = 0; i < row_len; i++) {
+            data_t* row = &A[i * row_len];
+
+            if (i < THRESHOLD) {
+                // Serial fallback for short head of forward sub
+                #pragma omp single
+                {
+                    data_t s = 0.0;
+                    for (int j = 0; j < i; j++) s += row[j] * x[j];
+                    x[i] = b[i] - s;
+                }
+
+            } else {
+                #pragma omp single
+                sum = 0.0;
+
+                #pragma omp for reduction(-:sum)
+                for (int j = 0; j < i; j++)
+                    sum += row[j] * x[j];
+
+                #pragma omp single
+                x[i] = b[i] - sum;
+            }
+        }
+
+        // Backward substitution: Ux = y
+        // Mirror of forward: large remaining count at high i, shrinks toward 0
+        for (int i = row_len - 1; i >= 0; i--) {
+            data_t* row = &A[i * row_len];
+            int remaining = row_len - 1 - i;
+
+            if (remaining < THRESHOLD) {
+                // Serial fallback for short tail of backward sub
+                #pragma omp single
+                {
+                    data_t s = 0.0;
+                    for (int j = i + 1; j < row_len; j++) s += row[j] * x[j];
+                    x[i] = (x[i] - s) / row[i];
+                }
+
+            } else {
+                #pragma omp single
+                sum = 0.0;
+
+                #pragma omp for reduction(-:sum)
+                for (int j = i + 1; j < row_len; j++)
+                    sum -= row[j] * x[j];
+
+                #pragma omp single
+                x[i] = (x[i] - sum) / row[i];
+            }
+        }
     }
-    for (int i = row_len - 1; i >= 0; i--) {
-        data_t* row = &A[i * row_len];
-        data_t sum = 0.0; 
-        for (int j = i + 1; j < row_len; j++) sum += row[j] * x[j]; 
-        x[i] = (x[i] - sum) / row[i]; 
-    }
+
+
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+    printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
 }
