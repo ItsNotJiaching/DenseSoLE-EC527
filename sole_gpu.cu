@@ -3,6 +3,7 @@
   #include <math.h>
   #include <omp.h>
   #include "sole.cuh"
+  #include <cusolverDn.h> 
 
   #define IMUL(a, b) __mul24(a, b)
 
@@ -156,3 +157,72 @@ __global__ void kernel_upper_step(data_t* A, int k, int row_len) {
     // Free-up device and host memory
     CUDA_SAFE_CALL(cudaFree(A_GPU));
   }
+
+  void cuBLAS(data_t* A, data_t* x, data_t* b, int row_len, int grid_len, int block_len) {
+    // Select GPU
+    CUDA_SAFE_CALL(cudaSetDevice(0));
+
+    // Arrays on GPU global memory
+    data_t *A_GPU, *b_GPU;
+    int *ipiv_GPU, *info_GPU;
+    size_t matSize = row_len * row_len * sizeof(data_t);
+    size_t vecSize = row_len * sizeof(data_t);
+
+    // Allocate GPU memory
+    CUDA_SAFE_CALL(cudaMalloc((void **)&A_GPU,    matSize));
+    CUDA_SAFE_CALL(cudaMalloc((void **)&b_GPU,    vecSize));
+    CUDA_SAFE_CALL(cudaMalloc((void **)&ipiv_GPU, row_len * sizeof(int)));
+    CUDA_SAFE_CALL(cudaMalloc((void **)&info_GPU, sizeof(int)));
+
+    // Transfer arrays to GPU
+    CUDA_SAFE_CALL(cudaMemcpy(A_GPU, A, matSize, cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(b_GPU, b, vecSize, cudaMemcpyHostToDevice));
+
+    // Create cuSOLVER handle
+    cusolverDnHandle_t handle;
+    cusolverDnCreate(&handle);
+
+    // Query workspace size (needed for cuBLAS)
+    int lwork;
+    cusolverDnDgetrf_bufferSize(handle, row_len, row_len, A_GPU, row_len, &lwork); //change to cusolverDnDgetrf_bufferSize for float
+    data_t* workspace;
+    CUDA_SAFE_CALL(cudaMalloc((void **)&workspace, lwork * sizeof(data_t)));
+
+    // GPU Timing variables
+    cudaEvent_t start, stop;
+    float elapsed_gpu;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+
+    // LU Factorization 
+    cusolverDnDgetrf(handle, row_len, row_len, A_GPU, row_len, workspace, NULL, info_GPU); //change to cusolverDnSgetrf for float
+
+    // Triangular solve — writes solution into b_GPU
+    cusolverDnDgetrs(handle, CUBLAS_OP_T, row_len, 1, A_GPU, row_len, NULL, b_GPU, row_len, info_GPU); //change to cusolverDnSgetrs for float
+
+    // Stop timer
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsed_gpu, start, stop);
+    printf("cuSOLVER LU + Solve time: %.2f ms\n", elapsed_gpu);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    // Check for errors
+    int info_host;
+    CUDA_SAFE_CALL(cudaMemcpy(&info_host, info_GPU, sizeof(int), cudaMemcpyDeviceToHost));
+    if (info_host != 0)
+        printf("  cuSOLVER WARNING: info = %d (singular matrix?)\n", info_host);
+
+    // Transfer results back — solution is in b_GPU
+    CUDA_SAFE_CALL(cudaMemcpy(x, b_GPU, vecSize, cudaMemcpyDeviceToHost));
+
+    // Cleanup
+    cusolverDnDestroy(handle);
+    CUDA_SAFE_CALL(cudaFree(A_GPU));
+    CUDA_SAFE_CALL(cudaFree(b_GPU));
+    CUDA_SAFE_CALL(cudaFree(ipiv_GPU));
+    CUDA_SAFE_CALL(cudaFree(info_GPU));
+    CUDA_SAFE_CALL(cudaFree(workspace));
+}
