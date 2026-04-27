@@ -88,21 +88,21 @@ int main(){
 
   int OPTION = 0;
 
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_avx(arrA_copy, arrX, arrB_copy, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
   // OPTION++;
   
@@ -116,21 +116,21 @@ int main(){
 
   //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
   //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_omp_balanced(arrA_copy, arrX, arrB_copy, n);
+  //   sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
   //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
   //   time_stamp[OPTION][x] = interval(time_start, time_stop);
   //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
   // }
 
-  OPTION++;
+  // OPTION++;
   
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
@@ -140,7 +140,7 @@ int main(){
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  OPTION++;
+  // OPTION++;
   
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
@@ -206,7 +206,7 @@ int main(){
 
   //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
   //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_serial(arrA_copy, arrX, arrB_copy, n);
+  //   sole_cuda(arrA_copy, arrX, arrB_copy, n, 1, 32);
   //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
   //   time_stamp[OPTION][x] = interval(time_start, time_stop);
   //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -224,18 +224,36 @@ int main(){
 
   //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
   //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 32);
+  //   cuBLAS(arrA_copy, arrX, arrB_copy, n, 1, 32);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // OPTION++;
+  
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_serial(arrA_copy, arrX, arrB_copy, n);
   //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
   //   time_stamp[OPTION][x] = interval(time_start, time_stop);
   //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
   // }
   
+  // printf("Running CUDA!\n");
   
-  printf("row_len, omp_naive, omp_naive_error, "
-        // "omp_balanced, omp_balanced_error, "
-        "cuda, cuda_error, "
-        "cuda_shared, cuda_shared_error, "
-        "cuda_combine, cuda_combine_error, "
+  
+  printf("row_len, avx, avx_error, omp_naive, omp_naive_error, "
+        "omp_altload, omp_altload_error, omp_optimized, omp_optimized_error\n");
+        // "cuda, cuda_error\n");
         // "serial_naive, serial_naive_error, "
         // "serial_blocked, serial_blocked_error\n");
         "cuBLAS, cuBLAS_error\n");
