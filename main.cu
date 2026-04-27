@@ -18,7 +18,7 @@ double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
 
 #define NUM_TESTS 12   /* Number of different sizes to test */
 
-#define OPTIONS 5
+#define OPTIONS 11
 #define TOLERANCE 1e-4
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
@@ -35,7 +35,7 @@ double interval(struct timespec start, struct timespec end)
 }
 
 /* This routine "wastes" a little time to make sure the machine gets
-   out of power-saving mode (800 MHz) and switches to normal speed. */
+   out of power-saving mode and switches to normal speed. */
 double wakeup_delay()
 {
   double meas = 0; int i, j;
@@ -60,7 +60,7 @@ double wakeup_delay()
 /**
  * Main Function. Only testing square matrices with array sizes multiple of 32.
  */
-int main(){
+int main() {
   // Initializations for time recording
   struct timespec time_start, time_stop;
   double time_stamp[OPTIONS][NUM_TESTS];
@@ -87,50 +87,140 @@ int main(){
   printf("This may take a while!\n\n");
 
   int OPTION = 0;
+  // Serial (Baseline)
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_serial(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
 
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_avx(arrA_copy, arrX, arrB_copy, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
+  OPTION++;
+  // Serial Blocked, Implementation 1
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-  // OPTION++;
-  
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 32);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
 
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
+  OPTION++;
+  // Serial Blocked, Implementation 2
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-  // OPTION++;
-  
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_blocked2(arrA_copy, arrX, arrB_copy, n, 32);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
+  // AVX Implementation
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_avx(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
+  // OpenMP Naive Implementation
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_omp_naive(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
+  // OpenMP Alternative Access Pattern Implementation
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_omp_altload(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
+  // OpenMP Optimized Implementation
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_omp_optimized(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
+  // CUDA Implementation, two kernels, global memory
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
@@ -140,8 +230,8 @@ int main(){
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  // OPTION++;
-  
+  OPTION++;
+  // CUDA Implementation, two kernels, local/shared memory
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
     data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -159,7 +249,7 @@ int main(){
   }
 
   OPTION++;
-  
+  // CUDA Implementation, one kernel, local/shared memory
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
     data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -177,7 +267,7 @@ int main(){
   }
 
   OPTION++;
-  
+  // Benchmark test (cuBLAS)
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
     data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -192,70 +282,19 @@ int main(){
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
-
-  // OPTION++;
+  }  
   
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
-
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_cuda(arrA_copy, arrX, arrB_copy, n, 1, 32);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
-
-  // OPTION++;
-  
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
-
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   cuBLAS(arrA_copy, arrX, arrB_copy, n, 1, 32);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
-
-  // OPTION++;
-  
-  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-  //   //copy originals
-  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
-  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
-
-  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
-  //   sole_serial(arrA_copy, arrX, arrB_copy, n);
-  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
-  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
-  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  // }
-  
-  // printf("Running CUDA!\n");
-  
-  
-  printf("row_len, avx, avx_error, omp_naive, omp_naive_error, "
-        "omp_altload, omp_altload_error, omp_optimized, omp_optimized_error\n");
-        // "cuda, cuda_error\n");
-        // "serial_naive, serial_naive_error, "
-        // "serial_blocked, serial_blocked_error\n");
+  printf("row_len, "
+        "serial, serial_err, "
+        "blocked1, blocked1_err, "
+        "blocked2, blocked2_err, "
+        "avx, avx_err, "
+        "omp, omp_err, "
+        "omp_altaccess, omp_altaccess_err, "
+        "omp_optimized, omp_optimized_err, "
+        "cuda, cuda_err, "
+        "cuda_shared, cuda_shared_err, "
+        "cuda_combine, cuda_combine_err, "
         "cuBLAS, cuBLAS_error\n");
 
   int i, j;
@@ -265,11 +304,11 @@ int main(){
       if (j != 0) {
         printf(", ");
       }
-      printf("%.3f, %.2f", (double) (1e3 * time_stamp[j][i]), error[j][i]);
+      printf("%.1f, %.2f", (double) (1e9 * time_stamp[j][i]), error[j][i]);
     }
     printf("\n");
   }
-  printf("Time units: ms\n");
+  printf("Time units: ns\n");
 
   printf("Wakeup delay computed: %g \n", wakeup_answer);
   return 0;
@@ -308,6 +347,7 @@ void print_array(data_t* v, int arr_len) {
 
 /**
  * Computes the total amount of error that is ABOVE tolerance
+ * @returns The total amount of error that is ABOVE tolerance
  * @authors Owen Jiang, Jiaxing Wang
  */
 double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n) {
@@ -318,7 +358,6 @@ double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n) {
       ax_i += (double)arrA[i*n + j] * (double)arrX[j];
     double diff = fabs(ax_i - (double)arrB[i]);
     if (diff > TOLERANCE) err += diff;
-    // if (err > max_err) max_err = err;
   }
   return err;
 }

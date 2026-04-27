@@ -8,13 +8,9 @@
 void detect_threads_setting() {
     long int i, ognt;
     char * env_ONT;
-
     /* Find out how many threads OpenMP thinks it is wants to use */
     #pragma omp parallel for
-    for(i=0; i<1; i++) {
-    ognt = omp_get_num_threads();
-    }
-
+    for (i=0; i<1; i++) ognt = omp_get_num_threads();
     printf("omp's default number of threads is %d\n", ognt);
 
     /* If this is illegal (0 or less), default to a DEFAULT_THREADS value */
@@ -25,14 +21,11 @@ void detect_threads_setting() {
             ognt = DEFAULT_THREADS;
         }
     }
-
     omp_set_num_threads(ognt);
 
     /* Once again ask OpenMP how many threads it is going to use */
     #pragma omp parallel for
-    for(i=0; i<1; i++) {
-        ognt = omp_get_num_threads();
-    }
+    for (i=0; i<1; i++) ognt = omp_get_num_threads();
     printf("Using %d threads for OpenMP\n", ognt);
 }
 
@@ -79,10 +72,9 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
         for (int j = 0; j < i; j++) //this basically creates L staircase
             sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
         x[i] = b[i] - sum;
-        // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
     }
 
-    //back sub Ux = y
+    // back sub Ux = y
     for (int i = row_len - 1; i >= 0; i--) {
         data_t* row = &A[i * row_len];
         data_t sum = 0.0; //intermediatary sum for dot product
@@ -153,7 +145,6 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
         for (int j = 0; j < i; j++) //this basically creates L staircase
             sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
         x[i] = b[i] - sum;
-        // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
     }
 
     //back sub Ux = y
