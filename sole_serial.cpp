@@ -5,16 +5,6 @@
 #include <cstring>
 #include "sole.cuh"
 
-void print_matrix(data_t* mat, int row_len) {
-  for (int i=0; i < row_len; i++) {
-    for (int j=0; j < row_len; j++) {
-      printf("%.3f ", mat[i*row_len + j]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-}
-
 /**
  * Serial Baseline. For an array length n, the computational complexity of 
  * naive LU decomposition is O(n^3), and its dataset size grows at O(n^2).
@@ -34,18 +24,16 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
             for k ← 0 to N-1 do //loop over all diagonal blocks 
                 for j ← k+1 to N-1 do  //for all blocks in the row of, and to the right of, this diagonal block 
                     Ak,j ← Ak,j * (Ak,k)-1; //divide by diagonal block 
+                endfor
                 for i ← k+1 to N-1 do  //for all rows below this diagonal block
                     for j ← k+1 to N-1 do //for all blocks in the corr. row 
                         Ai,j ← Ai,j - Ai,k* (Ak,j);    
-        endfor
-        endfor
-        endfor
-        endfor
+                    endfor
+                endfor
+             endfor
 
         Note that this example is in-place, so L and U are combined into one matrix.
     */
-    // printf("Original A Matrix: \n");
-    // print_matrix(A, row_len);
 
     data_t reciprocal; //precalculate division for each lower triangle calculation instead of computing division every time
     for (int k = 0; k < row_len; k++) {
@@ -55,21 +43,13 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
             A[j*row_len + k] *= reciprocal;                  
         }
 
-        // printf("Intermediate %d: \n", k);
-        // print_matrix(A, row_len);
-
         // for all rows below diagonal (U)
         for (int i = k + 1; i < row_len; i++) {
             for (int j = k + 1; j < row_len; j++) {
                 A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
             }
         }
-
-        // printf("Iteration %d: \n", k);
-        // print_matrix(A, row_len);
     }
-    // printf("Updated Matrix: \n");
-    // print_matrix(A, row_len);
 
     //forward sub Ly = b (uses x instead of y for better spatial locality)
     // L[i][0]*y[0] + L[i][1]*y[1] + ... + L[i][i]*y[i] = b[i], but done in reverse: 
