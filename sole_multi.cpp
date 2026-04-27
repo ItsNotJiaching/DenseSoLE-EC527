@@ -55,8 +55,8 @@ void detect_threads_setting() {
  */
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
     // Record LU Decomposition Only time
-    struct timespec time_start, time_stop;
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    // struct timespec time_start, time_stop;
+    // clock_gettime(CLOCK_MONOTONIC, &time_start);
 
     // LU Decomposition
     #pragma omp parallel
@@ -80,9 +80,9 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
     }
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
-    clock_gettime(CLOCK_REALTIME, &time_start);
+    // clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    // printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_MONOTONIC, &time_start);
 
     // forward sub Ly = b (uses x instead of y for better spatial locality)
     for (int i = 0; i < row_len; i++) {
@@ -105,8 +105,8 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_REALTIME, &time_stop);
+    // printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
 }
 
 /**
@@ -116,8 +116,8 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
  */
 void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
     // LU Decomposition
-    timespec time_start, time_stop, time_stamp;
-    clock_gettime(CLOCK_REALTIME, &time_start);
+    // timespec time_start, time_stop, time_stamp;
+    // clock_gettime(CLOCK_REALTIME, &time_start);
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
@@ -155,9 +155,9 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
     }
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing in OpenMP: %f\n", 1.0e3 * interval(time_start, time_stop));
-    clock_gettime(CLOCK_REALTIME, &time_start);
+    // clock_gettime(CLOCK_REALTIME, &time_stop);
+    // printf("Time spent computing in OpenMP: %f\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_REALTIME, &time_start);
     // forward sub Ly = b (uses x instead of y for better spatial locality)
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
@@ -179,8 +179,8 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
         x[i] = x[i]/row[i]; //divide by diagonal per the formula 
     }
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing subs: %f\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_REALTIME, &time_stop);
+    // printf("Time spent computing subs: %f\n", 1.0e3 * interval(time_start, time_stop));
 }
 
 /**
@@ -191,8 +191,8 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
  */
 void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {
     // Record LU Decomposition Only time
-    struct timespec time_start, time_stop;
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    // struct timespec time_start, time_stop;
+    // clock_gettime(CLOCK_MONOTONIC, &time_start);
 
     // LU Decomposition
     #pragma omp parallel
@@ -220,9 +220,9 @@ void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {
             }
         }
     }
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
-    clock_gettime(CLOCK_REALTIME, &time_start);
+    // clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    // printf("Time spent computing LU Decomposition: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_MONOTONIC, &time_start);
 
     int nthreads = omp_get_max_threads();
     const int THRESHOLD = nthreads * 2;
@@ -238,57 +238,57 @@ void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {
             data_t* row = &A[i * row_len];
 
             if (i < THRESHOLD) {
-                // Serial fallback for short head of forward sub
                 #pragma omp single
                 {
                     data_t s = 0.0;
                     for (int j = 0; j < i; j++) s += row[j] * x[j];
                     x[i] = b[i] - s;
                 }
-
             } else {
+                // Reset before reduction: reduction(+:sum) adds privates INTO
+                // sum_initial, so without this reset previous row's value accumulates
                 #pragma omp single
                 sum = 0.0;
 
-                #pragma omp for reduction(-:sum)
+                // reduction(+:sum): private_i initialized to 0, accumulates partial
+                // sum with +=, combines as sum = 0 + p0 + p1 + ... = true_sum
+                #pragma omp for reduction(+:sum)
                 for (int j = 0; j < i; j++)
-                    sum += row[j] * x[j];
+                    sum += row[j] * x[j];  // ← += throughout, no sign confusion
 
                 #pragma omp single
-                x[i] = b[i] - sum;
+                x[i] = b[i] - sum;  // b[i] - true_sum  ← correct
             }
         }
 
         // Backward substitution: Ux = y
-        // Mirror of forward: large remaining count at high i, shrinks toward 0
         for (int i = row_len - 1; i >= 0; i--) {
             data_t* row = &A[i * row_len];
             int remaining = row_len - 1 - i;
 
             if (remaining < THRESHOLD) {
-                // Serial fallback for short tail of backward sub
                 #pragma omp single
                 {
                     data_t s = 0.0;
                     for (int j = i + 1; j < row_len; j++) s += row[j] * x[j];
                     x[i] = (x[i] - s) / row[i];
                 }
-
             } else {
                 #pragma omp single
                 sum = 0.0;
 
-                #pragma omp for reduction(-:sum)
+                // reduction(+:sum): same logic as forward sub
+                // sum += gives true_sum directly, subtraction happens outside
+                #pragma omp for reduction(+:sum)
                 for (int j = i + 1; j < row_len; j++)
-                    sum -= row[j] * x[j];
+                    sum += row[j] * x[j];  // ← += not -=
 
                 #pragma omp single
-                x[i] = (x[i] - sum) / row[i];
+                x[i] = (x[i] - sum) / row[i];  // (x[i] - true_sum) / diag  ← correct
             }
         }
     }
 
-
-    clock_gettime(CLOCK_REALTIME, &time_stop);
-    printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+    // clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    // printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
 }
