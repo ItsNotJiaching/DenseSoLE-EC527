@@ -3,7 +3,7 @@
 ### Jiaxing Wang, Alvin Yan, Owen Jiang
 
 ### Summary
-This project explores the implementation and optimization of dense systems of linear equations. We start with a naive implementation of solving Ax=b through LU decomposition and forward and backward passes. Then, we optimize LU decomposition through blocking, vectorization, and parallelization through OpenMP and CUDA.
+This project explores the implementation and optimization of dense systems of linear equations. We start with a naive implementation of solving $$Ax=b$$ through LU decomposition and forward and backward passes. Then, we optimize LU decomposition through blocking, vectorization, and parallelization through OpenMP and CUDA.
 
 ### Implementations
 #### Serial
