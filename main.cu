@@ -6,19 +6,14 @@
 #include <cusolverDn.h>
 #include "sole.cuh"
 
-void init_matrix(data_t *mat, int len);
-void init_vector(data_t *mat, int len);
-double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
-
-
-// Let's do multiples of 8 for now
+// Testing will only be done in multiples of 32
 #define A   32  /* coefficient of x^2 */
 #define B   32  /* coefficient of x */
 #define C   32  /* constant term */
 
 #define NUM_TESTS 12   /* Number of different sizes to test */
 
-#define OPTIONS 11
+#define OPTIONS 10
 #define TOLERANCE 1e-4
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
@@ -58,7 +53,10 @@ double wakeup_delay()
 }
 
 /**
- * Main Function. Only testing square matrices with array sizes multiple of 32.
+ * Main Function. Creates an array of size Ax^2+Bx+C, where 
+ * tests with smaller arrays are sub-arrays of the large array created.
+ * Uses CPU-based clock_gettime (MONOTONIC) to record algorithm runtime performance.
+ * @authors Jiaxing Wang, Owen Jiang, Alvin Yan
  */
 int main() {
   // Initializations for time recording
@@ -105,7 +103,7 @@ int main() {
   }
 
   OPTION++;
-  // Serial Blocked, Implementation 1
+  // Serial Blocked
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
     data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -116,25 +114,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 32);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
-
-  OPTION++;
-  // Serial Blocked, Implementation 2
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
-
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked2(arrA_copy, arrX, arrB_copy, n, 32);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 32);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -242,7 +222,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_cuda_shared(arrA_copy, arrX, arrB_copy, n, 1024);
+    sole_cuda_local(arrA_copy, arrX, arrB_copy, n, 1024);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -284,10 +264,10 @@ int main() {
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }  
   
+  // Prints all results
   printf("row_len, "
         "serial, serial_err, "
-        "blocked1, blocked1_err, "
-        "blocked2, blocked2_err, "
+        "blocked, blocked_err, "
         "avx, avx_err, "
         "omp, omp_err, "
         "omp_altaccess, omp_altaccess_err, "
@@ -296,11 +276,9 @@ int main() {
         "cuda_shared, cuda_shared_err, "
         "cuda_combine, cuda_combine_err, "
         "cuBLAS, cuBLAS_error\n");
-
-  int i, j;
-  for (i = 0; i < NUM_TESTS; i++) {
+  for (int i = 0; i < NUM_TESTS; i++) {
     printf("%ld, ", A*i*i + B*i + C);
-    for (j = 0; j < OPTIONS; j++) {
+    for (int j = 0; j < OPTIONS; j++) {
       if (j != 0) {
         printf(", ");
       }
@@ -314,19 +292,30 @@ int main() {
   return 0;
 }
 
+/**
+ * Loads a matrix with random numbers; currently set to 
+ * random numbers between 0 and 100, though this can be changed.
+ * Taken from an EC527 lab.
+ * @param mat The pointer to the matrix
+ * @param len The row length of the matrix (total size = len^2)
+ */
 void init_matrix(data_t *mat, int len) {
   int i;
-  int max_num = 100; // changes this to initialize with higher numbers
-  // float randNum;
+  int max_num = 100; // changes this to set maximum number
   // srand(seed);
 
   for (i = 0; i < len*len; i++) {
-    // randNum = (float) rand() / RAND_MAX; // let randNum be a random integer
-    // mat[i] = randNum;
     mat[i] = data_t(rand() % (max_num - 1));
   }
 }
 
+/**
+ * Loads a vector with random numbers; currently set to 
+ * random numbers between 0 and 100, though this can be changed.
+ * Taken from an EC527 lab.
+ * @param vec The pointer to the vector
+ * @param len The length of the vector
+ */
 void init_vector(data_t *vec, int len) {
   int i;
   int max_num = 100; // changes this to initialize with higher numbers
@@ -335,6 +324,11 @@ void init_vector(data_t *vec, int len) {
     vec[i] = data_t(rand() % (max_num-1));
 }
 
+/**
+ * Prints the inputted matrix.
+ * @param v The pointer to the matrix
+ * @param arr_len The row length of the matrix
+ */
 void print_array(data_t* v, int arr_len) {
   for (int i=0; i < arr_len; i++) {
     for (int j=0; j < arr_len; j++) {

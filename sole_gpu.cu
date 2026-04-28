@@ -5,8 +5,6 @@
   #include "sole.cuh"
   #include <cusolverDn.h> 
 
-  #define IMUL(a, b) __mul24(a, b)
-
   // Assertion to check for errors
   #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
   inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
@@ -19,14 +17,15 @@
     }
   }
 
-__global__ void upper_step(data_t* A, int k, int row_len) {
-  int row = k + 1 + blockIdx.y * blockDim.y + threadIdx.y;
-  int col = k + 1 + blockIdx.x * blockDim.x + threadIdx.x;
-  if (row >= row_len || col >= row_len) return;
-  // Compute Remaining Elements in Rows right of and under pivot
-  A[row*row_len + col] -= A[row*row_len + k] * A[k*row_len + col];
-}
-
+/**
+ * Lower step of LU Decomposition using global memory.
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param k k'th pivot iteration of LU decomposition
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @return No return; computed outputs are stored in x.
+ * @author Jiaxing Wang
+ */
 __global__ void lower_step(data_t* A, int k, int row_len) {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -37,8 +36,33 @@ __global__ void lower_step(data_t* A, int k, int row_len) {
   A[row*row_len + k] = A[row*row_len + k] /A[k*row_len + k];
 }
 
-// should have no impact on performance
-__global__ void lower_step_shared(data_t* A, int k, int row_len) {
+/**
+ * Upper step of LU Decomposition using global memory.
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param k k'th pivot iteration of LU decomposition
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @return No return; computed outputs are stored in x.
+ * @author Jiaxing Wang
+ */
+__global__ void upper_step(data_t* A, int k, int row_len) {
+  int row = k + 1 + blockIdx.y * blockDim.y + threadIdx.y;
+  int col = k + 1 + blockIdx.x * blockDim.x + threadIdx.x;
+  if (row >= row_len || col >= row_len) return;
+  // Compute Remaining Elements in Rows right of and under pivot
+  A[row*row_len + col] -= A[row*row_len + k] * A[k*row_len + col];
+}
+
+/**
+ * Lower step of LU Decomposition using local memory.
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param k k'th pivot iteration of LU decomposition
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @return No return; computed outputs are stored in x.
+ * @author Jiaxing Wang
+ */
+__global__ void lower_step_local(data_t* A, int k, int row_len) {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   int row = k + 1 + tid;
   if (row >= row_len) return;
@@ -52,8 +76,16 @@ __global__ void lower_step_shared(data_t* A, int k, int row_len) {
   A[row*row_len+k] = elem;
 }
 
-// should have no impact on performance
-__global__ void upper_step_shared(data_t* A, int k, int row_len) {
+/**
+ * Upper step of LU Decomposition using local memory.
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param k k'th pivot iteration of LU decomposition
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @return No return; computed outputs are stored in x.
+ * @author Jiaxing Wang
+ */
+__global__ void upper_step_local(data_t* A, int k, int row_len) {
   int row = k + 1 + blockIdx.y * blockDim.y + threadIdx.y;
   int col = k + 1 + blockIdx.x * blockDim.x + threadIdx.x;
   if (row >= row_len || col >= row_len) return;
@@ -69,7 +101,16 @@ __global__ void upper_step_shared(data_t* A, int k, int row_len) {
   A[row*row_len + col] = elem;
 }
 
-/* NAIVE CUDA-PARALLEL, THEN SERIAL FOR THE GRID RIGHT OF + BELOW PIVOT UPDATES */
+/**
+ * Single-kernel version of LU Decomposition where each row is assigned a thread,
+ * so row updates are done sequentially.
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param k k'th pivot iteration of LU decomposition
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @return No return; computed outputs are stored in x.
+ * @author Jiaxing Wang
+ */
 __global__ void lower_upper_step(data_t* A, int k, int row_len) {
   extern __shared__ data_t pivot_row[];  // row_len - k - 1 elements
 
@@ -96,7 +137,12 @@ __global__ void lower_upper_step(data_t* A, int k, int row_len) {
 }
 
 /**
- * Takes the input data (each size being tested) 
+ * CUDA implementation of SoLE done with single CUDA kernel.
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param blockSize Size of CUDA block (number of threads per block)
  * @author Jiaxing Wang
  */
 void sole_cuda_combine(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
@@ -167,10 +213,15 @@ void sole_cuda_combine(data_t* A, data_t* x, data_t* b, int row_len, int blockSi
 }
 
 /**
- * Takes the input data (each size being tested) 
+ * CUDA implementation of SoLE done with two CUDA kernels using local memory.
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param blockSize Size of CUDA block (number of threads per block)
  * @author Jiaxing Wang
  */
-void sole_cuda_shared(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
+void sole_cuda_local(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
   // Select GPU
   CUDA_SAFE_CALL(cudaSetDevice(0));
 
@@ -196,14 +247,14 @@ void sole_cuda_shared(data_t* A, data_t* x, data_t* b, int row_len, int blockSiz
     int rows_remaining = row_len - k - 1;    // threads needed = rows below pivot
     int gridSize = (rows_remaining + blockSize - 1) / blockSize;
 
-    lower_step_shared<<<gridSize, blockSize>>>(A_GPU, k, row_len);
+    lower_step_local<<<gridSize, blockSize>>>(A_GPU, k, row_len);
 
     dim3 blockSizeRemain(16, 16);
     dim3 gridSizeRemain(
         (rows_remaining + 15) / 16,
         (rows_remaining + 15) / 16
     );
-    upper_step_shared<<<gridSizeRemain, blockSizeRemain>>>(A_GPU, k, row_len);
+    upper_step_local<<<gridSizeRemain, blockSizeRemain>>>(A_GPU, k, row_len);
 
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
@@ -246,7 +297,12 @@ void sole_cuda_shared(data_t* A, data_t* x, data_t* b, int row_len, int blockSiz
 }
 
 /**
- * Takes the input data (each size being tested) 
+ * CUDA implementation of SoLE done with two CUDA kernels, using global memory.
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param blockSize Size of CUDA block (number of threads per block)
  * @author Jiaxing Wang
  */
 void sole_cuda(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
@@ -325,7 +381,12 @@ void sole_cuda(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
 }
 
 /**
- * Benchmarking our solutions to cuBLAS
+ * cuBLAS (NVIDIA's library) implementation of SoLE.
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param blockSize Size of CUDA block (number of threads per block)
  * @author Owen Jiang 
  */
 void cuBLAS(data_t* A, data_t* x, data_t* b, int row_len) {

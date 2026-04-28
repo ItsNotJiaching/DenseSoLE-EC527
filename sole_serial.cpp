@@ -13,6 +13,7 @@
  * @param A pointer to input matrix, the A in the Ax=b.
  * @param x pointer to output vector, the x in the Ax=b.
  * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
  * 
  * @return No return; computed outputs are stored in x.
  * @author Owen Jiang
@@ -35,7 +36,7 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         Note that this example is in-place, so L and U are combined into one matrix.
     */
 
-    data_t reciprocal; //precalculate division for each lower triangle calculation instead of computing division every time
+    data_t reciprocal; // Calculate division outside j for loop
     for (int k = 0; k < row_len; k++) {
         reciprocal = 1/A[k*row_len + k];
         // Compute multipliers and store in lower triangle (L) 
@@ -43,7 +44,7 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
             A[j*row_len + k] *= reciprocal;                  
         }
 
-        // for all rows below diagonal (U)
+        // Compute row update for every row under and to right of pivot (U)
         for (int i = k + 1; i < row_len; i++) {
             for (int j = k + 1; j < row_len; j++) {
                 A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
@@ -51,35 +52,36 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
         }
     }
 
-    //forward sub Ly = b (uses x instead of y for better spatial locality)
+    // Forward sub Ly = b 
+    // Uses x instead of y for better spatial locality
     // L[i][0]*y[0] + L[i][1]*y[1] + ... + L[i][i]*y[i] = b[i], but done in reverse: 
-    // y[i] = b[i] - L[i][0]*y[0] - L[i][1]*y[1] ... because we already calculated y[0] and y[1] in previous passes, we can do this.
-    // see Golub & Van Loan Matrix Computations for full algorithm explanation
+    // y[i] = b[i] - L[i][0]*y[0] - L[i][1]*y[1] ... 
+    // because we already calculated y[0] and y[1] in previous passes, we can do this.
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
-        data_t sum = 0.0; //intermediatary sum for dot product
-        for (int j = 0; j < i; j++) //this basically creates L staircase
-            sum += row[j] * x[j]; //lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+        data_t sum = 0.0;
+        for (int j = 0; j < i; j++) // this basically creates L staircase
+            sum += row[j] * x[j]; // lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
         x[i] = b[i] - sum;
-        // x[i] /= 1.0 //divide by diagonal per formula. For lower diagonal, it's always one, so no point of calculating.
     }
 
-    //back sub Ux = y
-    //U[i][i]*x[i] + U[i][i+1]*x[i+1] + ... + U[i][n]*x[n] = y[i], but done in reverse:  
-    //x[i] = (y[i] - U[i][i+1]*x[i+1] - ... - U[i][n]*x[n]) / U[i][i]   ... because we already calculated y[0] and y[1] in previous passes, we can do this.
-    // see Golub & Van Loan Matrix Computations for full algorithm explanation
+    // Back sub Ux = y
+    // U[i][i]*x[i] + U[i][i+1]*x[i+1] + ... + U[i][n]*x[n] = y[i], but done in reverse:  
+    // x[i] = (y[i] - U[i][i+1]*x[i+1] - ... - U[i][n]*x[n]) / U[i][i]   ... 
+    // because we already calculated y[0] and y[1] in previous passes, we can do this.
     for (int i = row_len - 1; i >= 0; i--) {
         data_t* row = &A[i * row_len];
-        data_t sum = 0.0; //intermediatary sum for dot product
-        for (int j = i + 1; j < row_len; j++) //get ahead of diagonal to iterate through U
-            sum += row[j] * x[j]; //upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
-        x[i] = x[i] - sum; //writing existing y[i] into actual x[i]
-        x[i] = x[i]/row[i]; //divide by diagonal per the formula 
+        data_t sum = 0.0;
+        for (int j = i + 1; j < row_len; j++) // get ahead of diagonal to iterate through U
+            sum += row[j] * x[j]; // upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
+        x[i] = x[i] - sum; // writing existing y[i] into actual x[i]
+        x[i] = x[i]/row[i]; // divide by diagonal per the formula 
     }
 }
 
 /**
- * Serial Blocking Optimization (unsuccessful).
+ * Serial Blocking of LU Decomposition. Forward and backward passes are optimized
+ * using multiple (4) accumulators. 
  * @param A pointer to input matrix, the A in the Ax=b.
  * @param x pointer to output vector, the x in the Ax=b.
  * @param b pointer to the b in the Ax=b.
@@ -88,11 +90,12 @@ void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
  * 
  * @author Jiaxing Wang
  */
-void sole_blocked1(data_t* A, data_t* x, data_t* b, int row_len, int B) {
+void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
     int N = row_len / B; // N blocks in array
-    // Part 1: Block LU Decomposition
+    // Blocked LU Decomposition
+    // Much more complicated than serial LU decomposition!
     for (int k = 0; k < N; k++) {
-        // LU Decomposition of diagonal block A_{k, k} (Computes L_kk and U_kk in place)
+        // LU Decomposition of diagonal block A[k, k], computed in-place
         for (int kk = k * B; kk < k * B + B; kk++) {
             data_t reciprocal = 1.0 / A[kk * row_len + kk];
             // Compute multipliers for the block
@@ -119,8 +122,11 @@ void sole_blocked1(data_t* A, data_t* x, data_t* b, int row_len, int B) {
             }
         }
 
-        // Backward pass to update block column (computes L_{i, k})
+        // Backward pass to update block column (computes L_{i, k}) AND
+        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
+        // Computing both under one i loop instead of splitting into two
         for (int i = k + 1; i < N; i++) {
+            // Backward Pass
             for (int kk = k * B; kk < k * B + B; kk++) {
                 data_t reciprocal = 1.0 / A[kk * row_len + kk];
                 for (int ii = i * B; ii < i * B + B; ii++) {
@@ -130,10 +136,7 @@ void sole_blocked1(data_t* A, data_t* x, data_t* b, int row_len, int B) {
                     }
                 }
             }
-        }
-
-        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
-        for (int i = k + 1; i < N; i++) {
+            // Schur's Complement Update
             for (int j = k + 1; j < N; j++) {
                 // kij ordering to optimize for cache
                 for (int ii = i * B; ii < i * B + B; ii++) {
@@ -148,126 +151,51 @@ void sole_blocked1(data_t* A, data_t* x, data_t* b, int row_len, int B) {
         }
     }
 
-    // Part 2: Forward and Backward Substitution
-    // Same as in fully serial code
-    // Forward substitution: Ly = b
+    // Forward substitution: Ly = b; same as Serial
     for (int i = 0; i < row_len; i++) {
         data_t* row = &A[i * row_len];
-        data_t sum = 0.0; 
-        for (int j = 0; j < i; j++) {
+        data_t sum = 0.0;
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = 0; j < i-3; j+=4) {
             sum += row[j] * x[j]; 
-        } 
-        x[i] = b[i] - sum;
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
+        }
+        // Finish the rest that accumulators didn't get
+        for (; j < i; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = b[i] - (sum + sum2) - (sum3 + sum4);
     }
 
-    // Backward substitution: Ux = y
+    // Backward substitution: Ux = y; same as Serial
     for (int i = row_len - 1; i >= 0; i--) {
         data_t* row = &A[i * row_len];
         data_t sum = 0.0; 
-        for (int j = i + 1; j < row_len; j++) {
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = i + 1; j < row_len-3; j+=4) {
             sum += row[j] * x[j]; 
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
         }
-        x[i] = x[i] - sum; 
+        // Finish the rest that accumulators didn't get
+        for (; j < row_len; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = x[i] - (sum + sum2) - (sum3 + sum4); 
         x[i] = x[i] / row[i]; 
     }
 }
 
-/**
- * Serial Blocking Optimization (~33% faster at row_len ~4K).
- * @param A pointer to input matrix, the A in the Ax=b.
- * @param x pointer to output vector, the x in the Ax=b.
- * @param b pointer to the b in the Ax=b.
- * @param row_len Row length of array (total size would be row_len^2)
- * @param B block size
- * 
- * @author Alvin Yan
- */
-void sole_blocked2(data_t* A, data_t* x, data_t* b, int row_len, int B) {
-    int N = row_len / B;
-
-    for (int k = 0; k < N; k++) {
-
-        // Phase 1: Diagonal block factorization — unchanged
-        for (int kk = k * B; kk < k * B + B; kk++) {
-            data_t reciprocal = 1.0 / A[kk * row_len + kk];
-            for (int i = kk + 1; i < k * B + B; i++)
-                A[i * row_len + kk] *= reciprocal;
-            for (int i = kk + 1; i < k * B + B; i++)
-                for (int j = kk + 1; j < k * B + B; j++)
-                    A[i * row_len + j] -= A[i * row_len + kk] * A[kk * row_len + j];
-        }
-
-        // Phase 2: Block row update — compute U_{k,j} for ALL j first.
-        // Must fully complete before any Schur complement reads U_{k,j}.
-        for (int j = k + 1; j < N; j++) {
-            for (int kk = k * B; kk < k * B + B; kk++) {
-                for (int i = kk + 1; i < k * B + B; i++) {
-                    for (int jj = j * B; jj < j * B + B; jj++) {
-                        A[i * row_len + jj] -= A[i * row_len + kk] * A[kk * row_len + jj];
-                    }
-                }
-            }
-        }
-
-        // Precompute reciprocals once per kk — A[kk][kk] is fixed after phase 1.
-        // Original code recomputed these (N-k-1) times each inside the i-loop.
-        data_t recip[B];
-        for (int kk = k * B; kk < k * B + B; kk++)
-            recip[kk - k * B] = 1.0 / A[kk * row_len + kk];
-
-        // Phases 3+4 fused: for each block i, compute L_{i,k} then IMMEDIATELY
-        // run its Schur complement while L_{i,k} is still hot in L1 cache.
-        // Previously, phase 3 ran for ALL i before phase 4 touched any (i,j) pair,
-        // guaranteeing L_{i,k} was cold by the time Schur needed it.
-        for (int i = k + 1; i < N; i++) {
-
-            // Phase 3: Block column update for block i — compute L_{i,k}
-            for (int kk = k * B; kk < k * B + B; kk++) {
-                for (int ii = i * B; ii < i * B + B; ii++) {
-                    A[ii * row_len + kk] *= recip[kk - k * B]; // precomputed reciprocal
-                    for (int j = kk + 1; j < k * B + B; j++) {
-                        A[ii * row_len + j] -= A[ii * row_len + kk] * A[kk * row_len + j];
-                    }
-                }
-            }
-
-            // Phase 4: Schur complement for block row i.
-            // L_{i,k} (A[ii][kk]) is still in L1 from phase 3 above.
-            // U_{k,j} (A[kk][jj]) was written by phase 2 and is reused across
-            // all B rows of L_{i,k}, giving B-fold reuse vs. serial's 1-fold.
-            // Different i-blocks are fully independent — no correctness concern.
-            for (int j = k + 1; j < N; j++) {
-                for (int ii = i * B; ii < i * B + B; ii++) {
-                    for (int kk = k * B; kk < k * B + B; kk++) {
-                        data_t temp = A[ii * row_len + kk]; // L_{i,k} — hot in L1
-                        for (int jj = j * B; jj < j * B + B; jj++) {
-                            A[ii * row_len + jj] -= temp * A[kk * row_len + jj];
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Forward substitution: Ly = b
-    for (int i = 0; i < row_len; i++) {
-        data_t* row = &A[i * row_len];
-        data_t sum = 0.0;
-        for (int j = 0; j < i; j++) sum += row[j] * x[j];
-        x[i] = b[i] - sum;
-    }
-
-    // Backward substitution: Ux = y
-    for (int i = row_len - 1; i >= 0; i--) {
-        data_t* row = &A[i * row_len];
-        data_t sum = 0.0;
-        for (int j = i + 1; j < row_len; j++) sum += row[j] * x[j];
-        x[i] = (x[i] - sum) / row[i];
-    }
-}
-
 #include <immintrin.h>  // AVX + FMA intrinsics
-// Compile with: -mavx -mfma  OR  -march=native
 
 /**
  * Reduces a __m256d holding [v0, v1, v2, v3] to a single double v0+v1+v2+v3.
@@ -292,7 +220,11 @@ static inline double hsum256_pd(__m256d v) {
  * Requires AVX + FMA (Haswell/2013+ on Intel, Excavator/2015+ on AMD).
  * data_t must be double (64-bit). For float, replace __m256d with __m256
  * and all _pd suffixes with _ps, giving 8 lanes instead of 4.
- *
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * 
  * @author Alvin Yan
  */
 void sole_avx(data_t* A, data_t* x, data_t* b, int row_len) {

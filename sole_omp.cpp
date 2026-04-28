@@ -5,6 +5,9 @@
 #include <omp.h>
 #include "sole.cuh"
 
+/**
+ * From the OpenMP labs in EC527 to check how many threads are being used by the program.
+ */
 void detect_threads_setting() {
     long int i, ognt;
     char * env_ONT;
@@ -31,6 +34,12 @@ void detect_threads_setting() {
 
 /**
  * OpenMP Version of the base serial code (sole_serial) using Static Load Assignment
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len row length of matrix
+ * 
+ * @return No return; computed outputs are stored in x.
  * @author Jiaxing Wang
  */
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
@@ -91,6 +100,12 @@ void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len) {
 /**
  * OpenMP Version of the base serial code (sole_serial) using Static Load Assignment, But doing an "inverse load"
  * Group from outside in i.e. (first thread and last thread in one cluster, second thread and second to last thread, etc.)
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len row length of matrix
+ * 
+ * @return No return; computed outputs are stored in x.
  * @author Owen Jiang
  */
 void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
@@ -162,9 +177,13 @@ void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len) {
 }
 
 /**
- * OpenMP Version with load balancing
+ * OpenMP Version with attempted collapse optimization
  * Used collapse(2) in LU Decomposition to merge schular submatrix
  * Optimized small loops handling and shared sum management w/ explicit reset via single
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
  * @author Alvin Yan
  */
 void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {

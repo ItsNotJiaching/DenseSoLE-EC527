@@ -18,7 +18,7 @@ double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
 
 #define NUM_TESTS 16   /* Number of different sizes to test */
 
-#define OPTIONS 6
+#define OPTIONS 7
 #define TOLERANCE 1e-4
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
@@ -85,6 +85,24 @@ int main() {
   printf("This may take a while!\n\n");
 
   int OPTION = 0;
+  // Serial (Baseline)
+  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+    //copy originals
+    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+    memcpy(arrB_copy, arrB, n*sizeof(data_t));
+    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    sole_serial(arrA_copy, arrX, arrB_copy, n);
+    clock_gettime(CLOCK_MONOTONIC, &time_stop);
+    time_stamp[OPTION][x] = interval(time_start, time_stop);
+    error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  }
+
+  OPTION++;
   // Block size 8
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
@@ -96,7 +114,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 8);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 8);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -114,7 +132,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 16);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 16);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -132,7 +150,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 32);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 32);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -150,7 +168,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 64);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 64);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -168,7 +186,7 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 128);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 128);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
@@ -186,13 +204,14 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked1(arrA_copy, arrX, arrB_copy, n, 256);
+    sole_blocked(arrA_copy, arrX, arrB_copy, n, 256);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
   printf("row_len, "
+        "serial, serial_err, "
         "blocked1_8, blocked1_8_err, "
         "blocked1_16, blocked1_16_err, "
         "blocked1_32, blocked1_32_err, "

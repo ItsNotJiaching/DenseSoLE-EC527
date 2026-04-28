@@ -27,7 +27,7 @@ To implement in the future: CUDA with Shared Memory and Blocking
 
 ### Compilation Notes
 To compile all tests:
-nvcc -O1 -Xcompiler "-fopenmp,-mavx,-mfma" main.cu sole_serial.cpp sole_multi.cpp sole_gpu.cu -o test_sole -lcusolver -lcublas -lm 
+nvcc -O1 -Xcompiler "-fopenmp,-mavx,-mfma" main.cu sole_serial.cpp sole_omp.cpp sole_gpu.cu -o test_sole -lcusolver -lcublas -lm 
 
 To Run:
 OMP_NUM_THREADS=8 ./test_sole
@@ -37,7 +37,7 @@ gcc -O1 -mavx -mfma main_block.cpp sole_serial.cpp -o test_block
 ./test_block
 
 Just for OpenMP:
-gcc -O1 -fopenmp main_omp.cpp sole_multi.cpp -o test_openmp
+gcc -O1 -fopenmp main_omp.cpp sole_omp.cpp -o test_openmp
 OMP_NUM_THREADS=8 ./test_openmp
 (Change above with however many threads you intend to use)
 
