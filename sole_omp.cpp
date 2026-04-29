@@ -33,6 +33,80 @@ void detect_threads_setting() {
 }
 
 /**
+ * Serial Baseline. For an array length n, the computational complexity of 
+ * naive LU decomposition is O(n^3), and its dataset size grows at O(n^2).
+ * (Culler 236)
+ * 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * 
+ * @return No return; computed outputs are stored in x.
+ * @author Owen Jiang
+ */
+void sole_serial(data_t* A, data_t* x, data_t* b, int row_len) {
+
+    /* 
+        LU Factorization: Pseudocode
+            for k ← 0 to N-1 do //loop over all diagonal blocks 
+                for j ← k+1 to N-1 do  //for all blocks in the row of, and to the right of, this diagonal block 
+                    Ak,j ← Ak,j * (Ak,k)-1; //divide by diagonal block 
+                endfor
+                for i ← k+1 to N-1 do  //for all rows below this diagonal block
+                    for j ← k+1 to N-1 do //for all blocks in the corr. row 
+                        Ai,j ← Ai,j - Ai,k* (Ak,j);    
+                    endfor
+                endfor
+             endfor
+
+        Note that this example is in-place, so L and U are combined into one matrix.
+    */
+
+    data_t reciprocal; // Calculate division outside j for loop
+    for (int k = 0; k < row_len; k++) {
+        reciprocal = 1/A[k*row_len + k];
+        // Compute multipliers and store in lower triangle (L) 
+        for (int j = k + 1; j < row_len; j++) {
+            A[j*row_len + k] *= reciprocal;                  
+        }
+
+        // Compute row update for every row under and to right of pivot (U)
+        for (int i = k + 1; i < row_len; i++) {
+            for (int j = k + 1; j < row_len; j++) {
+                A[i*row_len + j] -= A[i*row_len + k] * A[k*row_len + j];     
+            }
+        }
+    }
+
+    // Forward sub Ly = b 
+    // Uses x instead of y for better spatial locality
+    // L[i][0]*y[0] + L[i][1]*y[1] + ... + L[i][i]*y[i] = b[i], but done in reverse: 
+    // y[i] = b[i] - L[i][0]*y[0] - L[i][1]*y[1] ... 
+    // because we already calculated y[0] and y[1] in previous passes, we can do this.
+    for (int i = 0; i < row_len; i++) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0;
+        for (int j = 0; j < i; j++) // this basically creates L staircase
+            sum += row[j] * x[j]; // lower half, basically. y[i] = b[i] - A[i*row_len] * y[j]. 
+        x[i] = b[i] - sum;
+    }
+
+    // Back sub Ux = y
+    // U[i][i]*x[i] + U[i][i+1]*x[i+1] + ... + U[i][n]*x[n] = y[i], but done in reverse:  
+    // x[i] = (y[i] - U[i][i+1]*x[i+1] - ... - U[i][n]*x[n]) / U[i][i]   ... 
+    // because we already calculated y[0] and y[1] in previous passes, we can do this.
+    for (int i = row_len - 1; i >= 0; i--) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0;
+        for (int j = i + 1; j < row_len; j++) // get ahead of diagonal to iterate through U
+            sum += row[j] * x[j]; // upper half, basically. x[i] = y[i] - A[i*row_len] * x[j]. 
+        x[i] = x[i] - sum; // writing existing y[i] into actual x[i]
+        x[i] = x[i]/row[i]; // divide by diagonal per the formula 
+    }
+}
+
+/**
  * OpenMP Version of the base serial code (sole_serial) using Static Load Assignment
  * @param A pointer to input matrix, the A in the Ax=b.
  * @param x pointer to output vector, the x in the Ax=b.
@@ -288,4 +362,256 @@ void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len) {
 
     // clock_gettime(CLOCK_MONOTONIC, &time_stop);
     // printf("Time spent computing subs: %.3f ms\n", 1.0e3 * interval(time_start, time_stop));
+}
+
+/**
+ * OMP Naive Blocking of LU Decomposition. Forward and backward passes are optimized
+ * using multiple (4) accumulators. 
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param B block size
+ * 
+ * @author Owen Jiang, Jiaxing Wang
+ */
+void sole_omp_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B) {
+    int N = row_len / B; // N blocks in array
+    // Blocked LU Decomposition
+    // Much more complicated than serial LU decomposition!
+    
+    for (int k = 0; k < N; k++) {
+        // LU Decomposition of diagonal block A[k, k], computed in-place
+        for (int kk = k * B; kk < k * B + B; kk++) {
+            data_t reciprocal = 1.0 / A[kk * row_len + kk];
+            // Compute multipliers for the block
+            for (int i = kk + 1; i < k * B + B; i++) {
+                A[i * row_len + kk] *= reciprocal;
+            }
+            
+            // Update the rest of the diagonal block
+            for (int i = kk + 1; i < k * B + B; i++) {
+                for (int j = kk + 1; j < k * B + B; j++) {
+                    A[i * row_len + j] -= A[i * row_len + kk] * A[kk * row_len + j];
+                }
+            }
+        }
+
+        // Forward pass to update block row (computes U_{k, j})
+        #pragma omp parallel for 
+        for (int j = k + 1; j < N; j++) {
+            for (int kk = k * B; kk < k * B + B; kk++) {
+                for (int i = kk + 1; i < k * B + B; i++) {
+                    for (int jj = j * B; jj < j * B + B; jj++) {
+                        A[i * row_len + jj] -= A[i * row_len + kk] * A[kk * row_len + jj];
+                    }
+                }
+            }
+        }
+
+        // Backward pass to update block column (computes L_{i, k}) AND
+        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
+        // Computing both under one i loop instead of splitting into two
+        #pragma omp parallel for 
+        for (int i = k + 1; i < N; i++) {
+            // Backward Pass
+            for (int kk = k * B; kk < k * B + B; kk++) {
+                data_t reciprocal = 1.0 / A[kk * row_len + kk];
+                for (int ii = i * B; ii < i * B + B; ii++) {
+                    A[ii * row_len + kk] *= reciprocal;
+                    for (int j = kk + 1; j < k * B + B; j++) {
+                        A[ii * row_len + j] -= A[ii * row_len + kk] * A[kk * row_len + j];
+                    }
+                }
+            }
+            // Schur's Complement Update
+            for (int j = k + 1; j < N; j++) {
+                // kij ordering to optimize for cache
+                for (int ii = i * B; ii < i * B + B; ii++) {
+                    for (int kk = k * B; kk < k * B + B; kk++) {
+                        data_t temp = A[ii * row_len + kk];
+                        for (int jj = j * B; jj < j * B + B; jj++) {
+                            A[ii * row_len + jj] -= temp * A[kk * row_len + jj];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Forward substitution: Ly = b; same as Serial
+    //#pragma omp parallel for
+    for (int i = 0; i < row_len; i++) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0;
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = 0; j < i-3; j+=4) {
+            sum += row[j] * x[j]; 
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
+        }
+        // Finish the rest that accumulators didn't get
+        for (; j < i; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = b[i] - (sum + sum2) - (sum3 + sum4);
+    }
+
+    // Backward substitution: Ux = y; same as Serial
+    //#pragma omp parallel for
+    for (int i = row_len - 1; i >= 0; i--) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0; 
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = i + 1; j < row_len-3; j+=4) {
+            sum += row[j] * x[j]; 
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
+        }
+        // Finish the rest that accumulators didn't get
+        for (; j < row_len; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = x[i] - (sum + sum2) - (sum3 + sum4); 
+        x[i] = x[i] / row[i]; 
+    }
+}
+
+/**
+ * OMP Load Balanced using OpenMP schedule dynamic and tiling
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param B block size
+ * @param T tile size
+ * 
+ * @author Owen Jiang, adapted from Jiaxing
+ */
+void sole_omp_tiled_unrolling(data_t* A, data_t* x, data_t* b, int row_len, int B, int T) {
+    int N = row_len / B; // N blocks in array
+    // Blocked LU Decomposition
+    // Much more complicated than serial LU decomposition!
+    
+    for (int k = 0; k < N; k++) {
+        // LU Decomposition of diagonal block A[k, k], computed in-place
+        for (int kk = k * B; kk < k * B + B; kk++) {
+            data_t reciprocal = 1.0 / A[kk * row_len + kk];
+            // Compute multipliers for the block
+            for (int i = kk + 1; i < k * B + B; i++) {
+                A[i * row_len + kk] *= reciprocal;
+            }
+            
+            // Update the rest of the diagonal block
+            for (int i = kk + 1; i < k * B + B; i++) {
+                for (int j = kk + 1; j < k * B + B; j++) {
+                    A[i * row_len + j] -= A[i * row_len + kk] * A[kk * row_len + j];
+                }
+            }
+        }
+
+        // Forward pass to update block row (computes U_{k, j})
+        #pragma omp parallel for 
+        for (int j = k + 1; j < N; j++) {
+            for (int kk = k * B; kk < k * B + B; kk++) {
+                for (int i = kk + 1; i < k * B + B; i++) {
+                    for (int jj = j * B; jj < j * B + B; jj++) {
+                        A[i * row_len + jj] -= A[i * row_len + kk] * A[kk * row_len + jj];
+                    }
+                }
+            }
+        }
+
+        // Backward pass to update block column (computes L_{i, k}) AND
+        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
+        // Computing both under one i loop instead of splitting into two
+        #pragma omp parallel for 
+        // Backward Pass
+        for (int kk = k * B; kk < k * B + B; kk++) {
+            data_t reciprocal = 1.0 / A[kk * row_len + kk];
+            for (int ii = k * B; ii < k * B + B; ii++) {
+                A[ii * row_len + kk] *= reciprocal;
+                for (int j = kk + 1; j < k * B + B; j++) {
+                    A[ii * row_len + j] -= A[ii * row_len + kk] * A[kk * row_len + j];
+                }
+            }
+        }
+        #pragma omp parallel for collapse(2) schedule(dynamic) //schedule dynamic has work pool where each thread updates their status
+        // Idea is that tiling partitions work among each thread. Then, within each tile, block the matrix inside. This makes it easier to load balance
+        // Schur's Complement Update
+        for (int ii = k + 1; ii < N; ii += T) {
+            for (int jj = k + 1; jj < N; jj += T) {
+
+                for (int i = ii; i < ii + T && i < N; i++) {
+                    for (int j = jj; j < jj + T && j < N; j++) {
+
+                        // Block (i,j) update
+                        for (int iii = i * B; iii < i * B + B; iii++) {
+                            for (int kk = k * B; kk < k * B + B; kk++) {
+                                data_t temp = A[iii * row_len + kk];
+                                for (int jjj = j * B; jjj < j * B + B; jjj++) {
+                                    A[iii * row_len + jjj] -= temp * A[kk * row_len + jjj];
+                                }
+                            }
+                        }
+
+                    }
+                }
+
+            }
+        }
+    }
+
+    // Forward substitution: Ly = b; same as Serial
+    //#pragma omp parallel for
+    for (int i = 0; i < row_len; i++) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0;
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = 0; j < i-3; j+=4) {
+            sum += row[j] * x[j]; 
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
+        }
+        // Finish the rest that accumulators didn't get
+        for (; j < i; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = b[i] - (sum + sum2) - (sum3 + sum4);
+    }
+
+    // Backward substitution: Ux = y; same as Serial
+    //#pragma omp parallel for
+    for (int i = row_len - 1; i >= 0; i--) {
+        data_t* row = &A[i * row_len];
+        data_t sum = 0.0; 
+        data_t sum2 = 0;
+        data_t sum3 = 0;
+        data_t sum4 = 0;
+        int j = 0;
+        // Dot products using four accumulators
+        for (j = i + 1; j < row_len-3; j+=4) {
+            sum += row[j] * x[j]; 
+            sum2 += row[j+1] * x[j+1];
+            sum3 += row[j+2] * x[j+2];
+            sum4 += row[j+3] * x[j+3];
+        }
+        // Finish the rest that accumulators didn't get
+        for (; j < row_len; j++) sum += row[j] * x[j]; 
+        // Changing associativity
+        x[i] = x[i] - (sum + sum2) - (sum3 + sum4); 
+        x[i] = x[i] / row[i]; 
+    }
 }

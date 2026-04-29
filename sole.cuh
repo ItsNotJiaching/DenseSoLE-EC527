@@ -20,6 +20,8 @@ void sole_avx(data_t* A, data_t* x, data_t* b, int row_len);
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len);
 void sole_omp_altload(data_t* A, data_t* x, data_t* b, int row_len);
 void sole_omp_optimized(data_t* A, data_t* x, data_t* b, int row_len);
+void sole_omp_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B);
+void sole_omp_tiled_unrolling(data_t* A, data_t* x, data_t* b, int row_len, int B, int T);
 
 // CUDA versions
 void sole_cuda(data_t* A, data_t* x, data_t* b, int row_len, int block_len);
