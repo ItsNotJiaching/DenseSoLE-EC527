@@ -243,16 +243,17 @@ void sole_cuda_local(data_t* A, data_t* x, data_t* b, int row_len, int blockSize
 
   // Launch the kernel
   // One kernel per pivot step — CUDA serializes launches on same stream
+  int blockLen = sqrt(blockSize);
   for (int k = 0; k < row_len - 1; k++) {
     int rows_remaining = row_len - k - 1;    // threads needed = rows below pivot
     int gridSize = (rows_remaining + blockSize - 1) / blockSize;
 
     lower_step_local<<<gridSize, blockSize>>>(A_GPU, k, row_len);
 
-    dim3 blockSizeRemain(16, 16);
+    dim3 blockSizeRemain(blockLen, blockLen);
     dim3 gridSizeRemain(
-        (rows_remaining + 15) / 16,
-        (rows_remaining + 15) / 16
+        (rows_remaining + blockLen-1) / blockLen,
+        (rows_remaining + blockLen-1) / blockLen
     );
     upper_step_local<<<gridSizeRemain, blockSizeRemain>>>(A_GPU, k, row_len);
 
@@ -327,16 +328,17 @@ void sole_cuda(data_t* A, data_t* x, data_t* b, int row_len, int blockSize) {
 
   // Launch the kernel
   // One kernel per pivot step — CUDA serializes launches on same stream
+  int blockLen = sqrt(blockSize);
   for (int k = 0; k < row_len - 1; k++) {
     int rows_remaining = row_len - k - 1;    // threads needed = rows below pivot
     int gridSize = (rows_remaining + blockSize - 1) / blockSize;
 
     lower_step<<<gridSize, blockSize>>>(A_GPU, k, row_len);
 
-    dim3 blockSizeRemain(16, 16);
+    dim3 blockSizeRemain(blockLen, blockLen);
     dim3 gridSizeRemain(
-        (rows_remaining + 15) / 16,
-        (rows_remaining + 15) / 16
+        (rows_remaining + blockLen-1) / blockLen,
+        (rows_remaining + blockLen-1) / blockLen
     );
     upper_step<<<gridSizeRemain, blockSizeRemain>>>(A_GPU, k, row_len);
 

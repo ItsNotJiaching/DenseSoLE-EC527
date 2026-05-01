@@ -38,6 +38,10 @@ To implement in the future: OpenMP and CUDA with Shared Memory and Blocking
     gcc -O1 -fopenmp main_omp.cpp sole_omp.cpp -o test_openmp
 **To execute:** OMP_NUM_THREADS=8 ./test_openmp
 
+#### To test GPU only, compile:
+    nvcc -O1 main_gpu.cu sole_gpu.cu -o test_gpu -lcusolver -lcublas -lm
+**To execute:** ./test_gpu
+
 (Change above with however many threads you intend to use)
 
 ### Other Notes
