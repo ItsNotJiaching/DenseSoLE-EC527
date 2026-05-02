@@ -18,7 +18,7 @@ double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
 
 #define NUM_TESTS 12   /* Number of different sizes to test */
 
-#define OPTIONS 3
+#define OPTIONS 9
 #define TOLERANCE 1e-4
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
