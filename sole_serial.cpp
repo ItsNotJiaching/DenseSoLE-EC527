@@ -317,3 +317,151 @@ void sole_avx(data_t* A, data_t* x, data_t* b, int row_len) {
         x[i] = (x[i] - sum) / row[i];
     }
 }
+
+/**
+ * Blocked AVX SIMD SoLE solver.
+ * Same structure as sole_blocked(), except with direct vectorization.
+ * @param A pointer to input matrix, the A in the Ax=b.
+ * @param x pointer to output vector, the x in the Ax=b.
+ * @param b pointer to the b in the Ax=b.
+ * @param row_len Row length of array (total size would be row_len^2)
+ * @param B block size
+ * 
+ * @author Alvin Yan
+ */
+void sole_blocked_avx(data_t* A, data_t* x, data_t* b, int row_len, int B) {
+    int N = row_len / B;
+
+    for (int k = 0; k < N; k++) {
+        int k_start = k * B;
+        int k_end   = k_start + B;
+
+        // LU Decomposition of diagonal block A[k, k], computed in-place
+        for (int kk = k_start; kk < k_end; kk++) {
+            data_t  reciprocal = 1.0 / A[kk * row_len + kk];
+            data_t* row_kk     = &A[kk * row_len];
+
+            for (int i = kk + 1; i < k_end; i++)
+                A[i * row_len + kk] *= reciprocal;
+
+            for (int i = kk + 1; i < k_end; i++) {
+                data_t* row_i  = &A[i * row_len];
+                data_t  mult_s = row_i[kk];
+                __m256d mult_v = _mm256_set1_pd(mult_s);
+                int j = kk + 1;
+                for (; j <= k_end - 4; j += 4) {
+                    __m256d aij = _mm256_loadu_pd(&row_i[j]);
+                    __m256d akj = _mm256_loadu_pd(&row_kk[j]);
+                    aij = _mm256_fnmadd_pd(mult_v, akj, aij); // aij -= mult * akj
+                    _mm256_storeu_pd(&row_i[j], aij);
+                }
+                for (; j < k_end; j++)
+                    row_i[j] -= mult_s * row_kk[j];
+            }
+        }
+
+        // Forward pass to update block row (computes U_{k, j})
+        for (int j = k + 1; j < N; j++) {
+            int j_start = j * B;
+            int j_end   = j_start + B;
+            for (int kk = k_start; kk < k_end; kk++) {
+                data_t* row_kk = &A[kk * row_len];
+                for (int i = kk + 1; i < k_end; i++) {
+                    data_t* row_i  = &A[i * row_len];
+                    data_t  mult_s = row_i[kk];
+                    __m256d mult_v = _mm256_set1_pd(mult_s);
+                    int jj = j_start;
+                    for (; jj <= j_end - 4; jj += 4) {
+                        __m256d aij = _mm256_loadu_pd(&row_i[jj]);
+                        __m256d akj = _mm256_loadu_pd(&row_kk[jj]);
+                        aij = _mm256_fnmadd_pd(mult_v, akj, aij);
+                        _mm256_storeu_pd(&row_i[jj], aij);
+                    }
+                    for (; jj < j_end; jj++)
+                        row_i[jj] -= mult_s * row_kk[jj];
+                }
+            }
+        }
+
+        // Backward pass to update block column (computes L_{i, k}) AND
+        // Schur Complement Update (A_{i, j} = A_{i, j} - L_{i, k} * U_{k, j})
+        // Computing both under one i loop instead of splitting into two
+        for (int i = k + 1; i < N; i++) {
+            int i_start = i * B;
+            int i_end   = i_start + B;
+
+            for (int kk = k_start; kk < k_end; kk++) {
+                data_t  reciprocal = 1.0 / A[kk * row_len + kk];
+                data_t* row_kk     = &A[kk * row_len];
+                for (int ii = i_start; ii < i_end; ii++) {
+                    A[ii * row_len + kk] *= reciprocal;
+                    data_t* row_ii = &A[ii * row_len];
+                    data_t  mult_s = row_ii[kk]; 
+                    __m256d mult_v = _mm256_set1_pd(mult_s);
+                    int j = kk + 1;
+                    for (; j <= k_end - 4; j += 4) {
+                        __m256d aij = _mm256_loadu_pd(&row_ii[j]);
+                        __m256d akj = _mm256_loadu_pd(&row_kk[j]);
+                        aij = _mm256_fnmadd_pd(mult_v, akj, aij);
+                        _mm256_storeu_pd(&row_ii[j], aij);
+                    }
+                    for (; j < k_end; j++)
+                        row_ii[j] -= mult_s * row_kk[j];
+                }
+            }
+
+            // Schur's Complement Update
+            for (int j = k + 1; j < N; j++) {
+                int j_start = j * B;
+                int j_end   = j_start + B;
+                for (int ii = i_start; ii < i_end; ii++) {
+                    data_t* row_ii = &A[ii * row_len];
+                    for (int kk = k_start; kk < k_end; kk++) {
+                        data_t  temp_s = row_ii[kk];
+                        __m256d temp_v = _mm256_set1_pd(temp_s);
+                        data_t* row_kk = &A[kk * row_len];
+                        int jj = j_start;
+                        for (; jj <= j_end - 4; jj += 4) {
+                            __m256d aij = _mm256_loadu_pd(&row_ii[jj]);
+                            __m256d akj = _mm256_loadu_pd(&row_kk[jj]);
+                            aij = _mm256_fnmadd_pd(temp_v, akj, aij);
+                            _mm256_storeu_pd(&row_ii[jj], aij);
+                        }
+                        for (; jj < j_end; jj++)
+                            row_ii[jj] -= temp_s * row_kk[jj];
+                    }
+                }
+            }
+        }
+    }
+
+    // Forward substitution: Ly = b; same as Serial
+    for (int i = 0; i < row_len; i++) {
+        data_t* row  = &A[i * row_len];
+        __m256d vsum = _mm256_setzero_pd();
+        int j = 0;
+        for (; j <= i - 4; j += 4) {
+            __m256d rj = _mm256_loadu_pd(&row[j]);
+            __m256d xj = _mm256_loadu_pd(&x[j]);
+            vsum = _mm256_fmadd_pd(rj, xj, vsum);
+        }
+        data_t sum = hsum256_pd(vsum);
+        for (; j < i; j++) sum += row[j] * x[j];
+        x[i] = b[i] - sum;
+    }
+
+    // Backward substitution: Ux = y; same as Serial
+    for (int i = row_len - 1; i >= 0; i--) {
+        data_t* row  = &A[i * row_len];
+        __m256d vsum = _mm256_setzero_pd();
+        int j = i + 1;
+        for (; j <= row_len - 4; j += 4) {
+            __m256d rj = _mm256_loadu_pd(&row[j]);
+            __m256d xj = _mm256_loadu_pd(&x[j]);
+            vsum = _mm256_fmadd_pd(rj, xj, vsum);
+        }
+        data_t sum = hsum256_pd(vsum);
+        for (; j < row_len; j++) sum += row[j] * x[j];
+        x[i] = (x[i] - sum) / row[i];
+    }
+}

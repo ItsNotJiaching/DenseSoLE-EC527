@@ -12,13 +12,13 @@ double verify(data_t* arrA, data_t* arrX, data_t* arrB, int n);
 
 
 // Let's do multiples of 8 for now
-#define A   0  /* coefficient of x^2 */
-#define B   256  /* coefficient of x */
-#define C   256  /* constant term */
+#define A   32  /* coefficient of x^2 */
+#define B   32  /* coefficient of x */
+#define C   32  /* constant term */
 
-#define NUM_TESTS 16   /* Number of different sizes to test */
+#define NUM_TESTS 12   /* Number of different sizes to test */
 
-#define OPTIONS 7
+#define OPTIONS 3
 #define TOLERANCE 1e-4
 
 /* -=-=-=-=- Time measurement by clock_gettime() -=-=-=-=- */
@@ -102,41 +102,41 @@ int main() {
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  OPTION++;
-  // Block size 8
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // OPTION++;
+  // // Block size 8
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked(arrA_copy, arrX, arrB_copy, n, 8);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 8);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
-  OPTION++;
-  // Block size 16
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // OPTION++;
+  // // Block size 16
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked(arrA_copy, arrX, arrB_copy, n, 16);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 16);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
   OPTION++;
   // Block size 32
@@ -156,8 +156,99 @@ int main() {
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
+  // OPTION++;
+  // // Block size 64
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 64);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // OPTION++;
+  // // Block size 128
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 128);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // OPTION++;
+  // // Block size 256
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked(arrA_copy, arrX, arrB_copy, n, 256);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // // blocked avx functions
+  // OPTION++;
+  // // Block size 8
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 8);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // OPTION++;
+  // // Block size 16
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 16);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
   OPTION++;
-  // Block size 64
+  // Block size 32
   for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
     //copy originals
     data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
@@ -168,56 +259,82 @@ int main() {
 
     printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
     clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked(arrA_copy, arrX, arrB_copy, n, 64);
+    sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 32);
     clock_gettime(CLOCK_MONOTONIC, &time_stop);
     time_stamp[OPTION][x] = interval(time_start, time_stop);
     error[OPTION][x] = verify(arrA, arrX, arrB,n);
   }
 
-  OPTION++;
-  // Block size 128
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // OPTION++;
+  // // Block size 64
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked(arrA_copy, arrX, arrB_copy, n, 128);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 64);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
-  OPTION++;
-  // Block size 256
-  for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
-    //copy originals
-    data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
-    data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
-    memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
-    memcpy(arrB_copy, arrB, n*sizeof(data_t));
-    data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+  // OPTION++;
+  // // Block size 128
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
 
-    printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
-    clock_gettime(CLOCK_MONOTONIC, &time_start);
-    sole_blocked(arrA_copy, arrX, arrB_copy, n, 256);
-    clock_gettime(CLOCK_MONOTONIC, &time_stop);
-    time_stamp[OPTION][x] = interval(time_start, time_stop);
-    error[OPTION][x] = verify(arrA, arrX, arrB,n);
-  }
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 128);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
+
+  // OPTION++;
+  // // Block size 256
+  // for (x=0; x<NUM_TESTS && (n = A*x*x + B*x + C, n<=arr_len); x++) {
+  //   //copy originals
+  //   data_t* arrA_copy = (data_t*) calloc(arr_len * arr_len, sizeof(data_t)); // copy for error check
+  //   data_t* arrB_copy = (data_t*) calloc(arr_len, sizeof(data_t)); // copy for error check
+  //   memcpy(arrA_copy, arrA, n*n*sizeof(data_t));
+  //   memcpy(arrB_copy, arrB, n*sizeof(data_t));
+  //   data_t* arrX = (data_t *) calloc(arr_len, sizeof(data_t));
+
+  //   printf(" Option %d, iter %ld, size %ld\n", OPTION, x, n);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_start);
+  //   sole_blocked_avx(arrA_copy, arrX, arrB_copy, n, 256);
+  //   clock_gettime(CLOCK_MONOTONIC, &time_stop);
+  //   time_stamp[OPTION][x] = interval(time_start, time_stop);
+  //   error[OPTION][x] = verify(arrA, arrX, arrB,n);
+  // }
 
   printf("row_len, "
         "serial, serial_err, "
-        "blocked1_8, blocked1_8_err, "
-        "blocked1_16, blocked1_16_err, "
-        "blocked1_32, blocked1_32_err, "
-        "blocked1_64, blocked1_64_err, "
-        "blocked1_128, blocked1_128_err, "
-        "blocked1_256, blocked1_256_err\n");
+        // "blocked_8, blocked_8_err, "
+        // "blocked_16, blocked_16_err, "
+        "blocked_32, blocked_32_err, "
+        // "blocked_64, blocked_64_err, "
+        // "blocked_128, blocked_128_err, "
+        // "blocked_256, blocked_256_err"
+        // "blocked_avx_8, blocked_avx_8_err, "
+        // "blocked_avx_16, blocked_avx_16_err, "
+        "blocked_avx_32, blocked_avx_32_err, "
+        // "blocked_avx_64, blocked_avx_64_err, "
+        // "blocked_avx_128, blocked_avx_128_err, "
+        // "blocked_avx_256, blocked_avx_256_err"
+        "\n"
+      );
 
   int i, j;
   for (i = 0; i < NUM_TESTS; i++) {

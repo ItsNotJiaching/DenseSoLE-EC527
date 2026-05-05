@@ -15,6 +15,7 @@ void sole_blocked(data_t* A, data_t* x, data_t* b, int row_len, int B);
 
 // AVX versions
 void sole_avx(data_t* A, data_t* x, data_t* b, int row_len);
+void sole_blocked_avx(data_t* A, data_t* x, data_t* b, int row_len, int B);
 
 // OpenMP versions
 void sole_omp_naive(data_t* A, data_t* x, data_t* b, int row_len);
